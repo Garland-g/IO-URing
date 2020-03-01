@@ -46,17 +46,41 @@ method nop(Int $user_data) {
   io_uring_submit($!ring);
 }
 
+method readv() {
+  my CArray[io_uring_sqe] $arr .= new;
+  $arr[0] = io_uring_sqe.new;
+  my $p_sqe := nativecast(Pointer[io_uring_sqe], $arr);
+  my $sqe := $p_sqe.deref;
+  is $p_sqe.deref, $sqe;
+}
+
 =begin pod
 
 =head1 NAME
 
-io_uring - Access the io_uring interface from Raku
+IO::URing - Access the io_uring interface from Raku
 
 =head1 SYNOPSIS
 
+Sample NOP call
+
 =begin code :lang<raku>
 
-use io_uring;
+use IO::URing;
+
+my IO::URing $ring .= new(:8entries, :0flags);
+start {
+  sleep 0.1
+  $ring.nop(1);
+}
+react {
+  whenever signal(SIGINT) {
+    say "done"; exit;
+  }
+  whenever $ring.Supply -> $data {
+    say "data: {$data.raku}";
+  }
+}
 
 =end code
 

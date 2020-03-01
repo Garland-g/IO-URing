@@ -3,13 +3,29 @@
 NAME
 ====
 
-io_uring - Access the io_uring interface from Raku
+IO::URing - Access the io_uring interface from Raku
 
 SYNOPSIS
 ========
 
+Sample NOP call
+
 ```raku
-use io_uring;
+use IO::URing;
+
+my IO::URing $ring .= new(:8entries, :0flags);
+start {
+  sleep 0.1
+  $ring.nop(1);
+}
+react {
+  whenever signal(SIGINT) {
+    say "done"; exit;
+  }
+  whenever $ring.Supply -> $data {
+    say "data: {$data.raku}";
+  }
+}
 ```
 
 DESCRIPTION
