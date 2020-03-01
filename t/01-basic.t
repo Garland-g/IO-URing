@@ -1,6 +1,6 @@
 use v6;
 use Test;
-use io_uring::Raw;
+use IO::URing::Raw;
 use NativeCall;
 
 my io_uring $ring .= new;

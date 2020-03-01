@@ -1,5 +1,5 @@
 use NativeCall;
-use Universal::errno;
+#use Universal::errno;
 
 constant LIB = "uring";
 
@@ -232,10 +232,6 @@ multi sub io_uring_submit_and_wait(|c) is export {
   !! $result
 }
 
-sub io_uring_wait_cqe_timeout(io_uring, Pointer[io_uring_cqe] is rw, kernel_timespec) is native(LIB) is export { ... }
-
-sub io_uring_get_sqe(io_uring) returns io_uring_sqe is native(LIB) is export { ... }
-
 multi sub _io_uring_wait_cqe_timeout(io_uring, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32 is native(LIB) is symbol('io_uring_wait_cqe_timeout') is export(:_io_uring_wait_cqe_timeout) { ... }
 
 multi sub io_uring_wait_cqe_timeout(|c) returns int32 is export {
@@ -286,3 +282,4 @@ sub io_uring_prep_nop(io_uring_sqe $sqe, $user_data) is export {
 }
 
 sub io_uring_cqe_get_data(io_uring_cqe $cqe --> Pointer) is export { Pointer[void].new(+$cqe.user_data) }
+

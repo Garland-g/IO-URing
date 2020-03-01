@@ -7,10 +7,11 @@
   "depends" : [ ],
   "description" : "blah blah blah",
   "license" : "Artistic-2.0",
-  "name" : "io_uring",
-  "perl" : "6.c",
+  "name" : "IO::URing",
+  "perl" : "6.d",
   "provides" : {
-    "io_uring" : "lib/io_uring.pm6"
+    "IO::URing" : "lib/IO/URing.pm6",
+    "IO::URing::Raw" : "lib/IO/URing/Raw"
   },
   "resources" : [ ],
   "source-url" : "",

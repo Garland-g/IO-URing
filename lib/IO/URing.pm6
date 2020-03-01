@@ -1,9 +1,9 @@
 use v6.c;
-use io_uring::Raw;
+use IO::URing::Raw;
 use NativeCall;
 use Test;
 
-unit class io-uring:ver<0.0.1>:auth<cpan:GARLANDG>;
+unit class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG>;
 has io_uring $!ring .= new;
 has Supplier $!supplier .= new;
 has Supply $!supply;
@@ -62,7 +62,7 @@ use io_uring;
 
 =head1 DESCRIPTION
 
-io_uring is a binding to the new io_uring interface in the Linux kernel.
+IO::URing is a binding to the new io_uring interface in the Linux kernel.
 
 =head1 AUTHOR
 

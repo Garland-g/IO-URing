@@ -1,8 +1,8 @@
 use v6;
 use Test;
-use io_uring;
+use IO::URing;
 
-my io-uring $ring .= new(:2entries, :0flags);
+my IO::URing $ring .= new(:2entries, :0flags);
 
 # Random values to prove that no cheating is happening
 my @test-val = (^1000).pick(3);
