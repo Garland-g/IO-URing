@@ -1,0 +1,20 @@
+{
+  "auth" : "cpan:GARLANDG",
+  "authors" : [
+    "Travis Gibson"
+  ],
+  "build-depends" : [ ],
+  "depends" : [ ],
+  "description" : "blah blah blah",
+  "license" : "Artistic-2.0",
+  "name" : "io_uring",
+  "perl" : "6.c",
+  "provides" : {
+    "io_uring" : "lib/io_uring.pm6"
+  },
+  "resources" : [ ],
+  "source-url" : "",
+  "tags" : [ ],
+  "test-depends" : [ ],
+  "version" : "0.0.1"
+}
