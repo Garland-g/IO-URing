@@ -195,24 +195,62 @@ constant IORING_REGISTER_PROBE = 8;
 constant IORING_REGISTER_PERSONALITY = 9;
 constant IORING_UNREGISTER_PERSONALITY = 10;
 
-sub io_uring_queue_init(uint32 $entries, io_uring, uint32 $flags) is native(LIB) is export { ... }
+multi sub io_uring_queue_init(UInt $entries, io_uring $ring, UInt $flags) returns int32 is export {
+  my uint32 $entries-u32 = $entries;
+  my uint32 $flags-u32 = $flags;
+  my int32 $result = _io_uring_queue_init($entries-u32, $ring, $flags-u32);
+  return $result < 0
+  ?? do {
+    fail "ring setup failed";
+  }
+  !! $result;
+}
+
+multi sub _io_uring_queue_init(uint32 $entries, io_uring, uint32 $flags) returns int32 is native(LIB) is symbol('io_uring_queue_init') is export(:_io_uring_queue_init) { ... }
 
 sub io_uring_queue_exit(io_uring) is native(LIB) is export { ... }
-sub io_uring_submit(io_uring) is native(LIB) is export { ... }
+
+multi sub io_uring_submit(|c) returns int32 is export {
+  my int32 $result = _io_uring_submit(|c);
+  return $result != 1
+  ?? do {
+    fail "sqe submit failed: $result";
+  }
+  !! $result
+}
+
+multi sub _io_uring_submit(io_uring --> int32) is native(LIB) is symbol('io_uring_submit') is export(:_io_uring_queue_init) { ... }
 
 multi sub _io_uring_submit_and_wait(io_uring, uint32 $wait_nr) is native(LIB) is symbol('io_uring_submit_and_wait') { ... }
 
-multi sub io_uring_submit_and_wait(io_uring $ring, Int $wait_nr) is export {
-  my uint32 $wait = $wait_nr;
-  _io_uring_submit_and_wait($ring, $wait);
+multi sub io_uring_submit_and_wait(|c) is export {
+  my int32 $result = _io_uring_submit_and_wait(|c);
+  return $result < 0
+  ?? do {
+    fail "sqe submit and wait failed: $result";
+  }
+  !! $result
 }
 
 sub io_uring_wait_cqe_timeout(io_uring, Pointer[io_uring_cqe] is rw, kernel_timespec) is native(LIB) is export { ... }
 
 sub io_uring_get_sqe(io_uring) returns io_uring_sqe is native(LIB) is export { ... }
 
-sub io_uring_wait_cqe(io_uring $ring, Pointer[io_uring_cqe] $cqe is rw) is export {
-  return io_uring_wait_cqe_timeout($ring, $cqe, kernel_timespec);
+multi sub _io_uring_wait_cqe_timeout(io_uring, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32 is native(LIB) is symbol('io_uring_wait_cqe_timeout') is export(:_io_uring_wait_cqe_timeout) { ... }
+
+multi sub io_uring_wait_cqe_timeout(|c) returns int32 is export {
+  my int32 $result = _io_uring_wait_cqe_timeout(|c);
+  return $result != 0
+  ?? do {
+    fail "io_uring_wait_cqe_timout=$result"
+  }
+  !! $result
+}
+
+sub io_uring_get_sqe(io_uring) returns io_uring_sqe is native(LIB) is symbol('io_uring_get_sqe') is export { ... }
+
+sub io_uring_wait_cqe(|c) is export {
+  return io_uring_wait_cqe_timeout(|c, kernel_timespec);
 }
 
 sub io_uring_advance(io_uring $ring, uint32 $nr) is export {

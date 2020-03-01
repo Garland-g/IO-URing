@@ -8,12 +8,12 @@ has io_uring $!ring .= new;
 has Supplier $!supplier .= new;
 has Supply $!supply;
 
-submethod TWEAK(Int :$entries, Int :$flags = IORING_FEAT_SINGLE_MMAP +| IORING_FEAT_NODROP +| IORING_FEAT_SUBMIT_STABLE) {
+submethod TWEAK(UInt :$entries, UInt :$flags = IORING_FEAT_SINGLE_MMAP +| IORING_FEAT_NODROP +| IORING_FEAT_SUBMIT_STABLE) {
   io_uring_queue_init($entries, $!ring, $flags);
   start {
     loop {
       my Pointer[io_uring_cqe] $cqe_ptr .= new;
-      io_uring_wait_cqe_timeout($!ring, $cqe_ptr, kernel_timespec);
+      io_uring_wait_cqe($!ring, $cqe_ptr);
       my io_uring_cqe $temp = $cqe_ptr.deref;
       $!supplier.emit($temp);
       io_uring_cqe_seen($!ring, $cqe_ptr.deref.clone);
@@ -40,15 +40,10 @@ method Supply {
   };
 }
 
-method nop(Int $user_data, :$wait-for = 0) {
+method nop(Int $user_data) {
   my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
   io_uring_prep_nop($sqe, $user_data);
-  if $wait-for {
-    io_uring_submit_and_wait($!ring, $wait-for)
-  }
-  else {
-    io_uring_submit($!ring);
-  }
+  io_uring_submit($!ring);
 }
 
 =begin pod
