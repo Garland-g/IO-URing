@@ -5,13 +5,13 @@
   ],
   "build-depends" : [ ],
   "depends" : [ ],
-  "description" : "blah blah blah",
+  "description" : "Access the io_uring interface from Raku",
   "license" : "Artistic-2.0",
   "name" : "IO::URing",
   "perl" : "6.d",
   "provides" : {
     "IO::URing" : "lib/IO/URing.pm6",
-    "IO::URing::Raw" : "lib/IO/URing/Raw"
+    "IO::URing::Raw" : "lib/IO/URing/Raw.pm6"
   },
   "resources" : [ ],
   "source-url" : "",
