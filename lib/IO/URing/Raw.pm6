@@ -3,7 +3,128 @@ use NativeCall;
 
 constant LIB = "uring";
 
+constant __NR_io_uring_setup = 535;
+constant __NR_io_uring_enter = 536;
+constant __NR_io_uring_register = 537;
+
+# linux 5.1
+constant IORING_SETUP_IOPOLL = 1;     # (1U << 0)
+constant IORING_SETUP_SQPOLL = 2;     # (1U << 1)
+constant IORING_SETUP_SQ_AFF = 4;     # (1U << 2)
+# linux 5.5
+constant IORING_SETUP_CQSIZE = 8;     # (1U << 3)
+# linux 5.6
+constant IORING_SETUP_CLAMP = 16;     # (1U << 4)
+constant IORING_SETUP_ATTACH_WQ = 32; # (1U << 5)
+
+#linux 5.1
+constant IORING_FSYNC_DATASYNC = 1; #fsync_flags
+
+#linux 5.5
+constant IORING_TIMEOUT_ABS = 1; #timeout_flags
+
+#linux 5.1
+constant IORING_OFF_SQ_RING = 0;
+constant IORING_OFF_CQ_RING = 0x8000000;
+constant IORING_OFF_SQES    = 0x10000000;
+
+#linux 5.1
+constant IORING_SQ_NEED_WAKEUP = 1;
+
+# linux 5.1
+constant IOSQE_FIXED_FILE = 1;  # (1U << IOSQE_FIXED_FILE_BIT)
+# linux 5.2
+constant IOSQE_IO_DRAIN = 2;    # (1U << IOSQE_IO_DRAIN_BIT)
+# linux 5.3
+constant IOSQE_IO_LINK = 4;     # (1U << IOSQE_IO_LINK_BIT)
+# linux 5.5
+constant IOSQE_IO_HARDLINK = 8; # (1U << IOSQE_IO_HARDLINK_BIT)
+# linux 5.6
+constant IOSQE_ASYNC = 16;      # (1U << IOSQE_ASYNC_BIT)
+
+#linux 5.6
+constant IOSQE_FIXED_FILE_BIT = 0;
+constant IOSQE_IO_DRAIN_BIT = 1;
+constant IOSQE_IO_LINK_BIT = 2;
+constant IOSQE_IO_HARDLINK_BIT = 3;
+constant IOSQE_ASYNC_BIT = 4;
+
+# linux 5.1
 constant IORING_OP_NOP = 0;
+constant IORING_OP_READV = 1;
+constant IORING_OP_WRITEV = 2;
+constant IORING_OP_FSYNC = 3;
+constant IORING_OP_READ_FIXED = 4;
+constant IORING_OP_WRITE_FIXED = 5;
+constant IORING_OP_POLL_ADD = 6;
+constant IORING_OP_POLL_REMOVE = 7;
+# linux 5.2
+constant IORING_OP_SYNC_FILE_RANGE = 8;
+# linux 5.3
+constant IORING_OP_SENDMSG = 9;
+constant IORING_OP_RECVMSG = 10;
+# linux 5.4
+constant IORING_OP_TIMEOUT = 11;
+# linux 5.5
+constant IORING_OP_TIMEOUT_REMOVE = 12;
+constant IORING_OP_ACCEPT = 13;
+constant IORING_OP_ASYNC_CANCEL = 14;
+constant IORING_OP_LINK_TIMEOUT = 15;
+constant IORING_OP_CONNECT = 16;
+# linux 5.6
+constant IORING_OP_FALLOCATE = 17;
+constant IORING_OP_OPENAT = 18;
+constant IORING_OP_CLOSE = 19;
+constant IORING_OP_FILES_UPDATE = 20;
+constant IORING_OP_STATX = 21;
+constant IORING_OP_READ = 22;
+constant IORING_OP_WRITE = 23;
+constant IORING_OP_FADVISE = 24;
+constant IORING_OP_MADVISE = 25;
+constant IORING_OP_SEND = 26;
+constant IORING_OP_RECV = 27;
+constant IORING_OP_OPENAT2 = 28;
+constant IORING_OP_EPOLL_CTL = 29;
+constant IORING_OP_LAST = 30;
+# end
+
+constant IORING_ENTER_GETEVENTS = 1;
+constant IORING_ENTER_SQ_WAKEUP = 2;
+
+sub free(Pointer) is native is export { ... }
+
+#TODO This class is here for type-safety purposes, but does not function
+# properly. Currently is only being used as a nativecast type target.
+class iovec is repr('CStruct') is rw is export {
+  has Pointer $.iov_base;
+  has size_t $.iov_len;
+
+  submethod BUILD(Pointer:D :$iov_base, Int:D :$iov_len) {
+    $!iov_base := $iov_base;
+    $!iov_len = $iov_len;
+  }
+
+  multi method new(Buf $buf --> iovec) {
+    self.bless(iov_base => nativecast(Pointer, $buf), iov_len => $buf.bytes);
+  }
+
+  multi method new(Pointer:D :$iov_base, Int:D :$iov_len) {
+    self.bless(:$iov_base, :$iov_len);
+  }
+
+  method Buf {
+    my buf8 $buf .= new;
+    my $arr = nativecast(Pointer[CArray[int8]], self);
+    for ^$!iov_len {
+      $buf.write-int8($_, $arr[$_]);
+    }
+    $buf;
+  }
+
+  method Numeric {
+    return +nativecast(Pointer, self);
+  }
+}
 
 class kernel_timespec is repr('CStruct') is rw is export {
   has uint64 $tv_sec;
@@ -176,21 +297,29 @@ class io_uring_params is repr('CStruct') {
 }
 
 # io_uring_params features flags
-constant IORING_FEAT_SINGLE_MMAP is export = 1;
-constant IORING_FEAT_NODROP is export = 2;
-constant IORING_FEAT_SUBMIT_STABLE is export = 4;
-constant IORING_FEAT_RW_CUR_POS is export = 8;
-constant IORING_FEAT_CUR_PERSONALITY is export = 16;
+# linux 5.4
+constant IORING_FEAT_SINGLE_MMAP is export = 1;      # 1U << 0
+# linux 5.5
+constant IORING_FEAT_NODROP is export = 2;           # 1U << 1
+constant IORING_FEAT_SUBMIT_STABLE is export = 4;    # 1U << 2
+# linux 5.6
+constant IORING_FEAT_RW_CUR_POS is export = 8;       # 1U << 3
+constant IORING_FEAT_CUR_PERSONALITY is export = 16; # 1U << 4
+#TODO # linux 5.7?
+constant IORING_FEAT_FAST_POLL is export = 32;       # 1U << 5
 
 # io_uring_register opcodes and arguments
+# linux 5.4
 constant IORING_REGISTER_BUFFERS = 0;
 constant IORING_UNREGISTER_BUFFERS = 1;
 constant IORING_REGISTER_FILES = 2;
 constant IORING_UNREGISTER_FILES = 3;
 constant IORING_REGISTER_EVENTFD = 4;
 constant IORING_UNREGISTER_EVENTFD = 5;
+# linux 5.5
 constant IORING_REGISTER_FILES_UPDATE = 6;
 constant IORING_REGISTER_EVENTFD_ASYNC = 7;
+# linux 5.6
 constant IORING_REGISTER_PROBE = 8;
 constant IORING_REGISTER_PERSONALITY = 9;
 constant IORING_UNREGISTER_PERSONALITY = 10;
