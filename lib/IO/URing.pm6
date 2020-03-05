@@ -40,18 +40,40 @@ method Supply {
   };
 }
 
-method nop(Int $user_data) {
+method nop(Int $user_data = 0) {
   my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
   io_uring_prep_nop($sqe, $user_data);
   io_uring_submit($!ring);
 }
 
-method readv() {
-  my CArray[io_uring_sqe] $arr .= new;
-  $arr[0] = io_uring_sqe.new;
-  my $p_sqe := nativecast(Pointer[io_uring_sqe], $arr);
-  my $sqe := $p_sqe.deref;
-  is $p_sqe.deref, $sqe;
+method readv($fd, @bufs, Int :$offset = 0, Int :$user_data = 0) {
+  my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+  my $num_vr = @bufs.elems;
+  my buf8 $iovecs .= new;
+  my $pos = 0;
+  for ^$num_vr -> $num {
+    #TODO Fix when nativecall gets better.
+    # Hack together array of struct iovec from definition
+    $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
+    $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
+  }
+  io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset, $user_data);
+  io_uring_submit($!ring);
+}
+
+method writev($fd, @bufs, Int :$offset = 0, Int :$user_data = 0) {
+  my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+  my $num_vr = @bufs.elems;
+  my buf8 $iovecs .= new;
+  my $pos = 0;
+  for ^$num_vr -> $num {
+    #TODO Fix when nativecall gets better.
+    # Hack together array of struct iovec from definition
+    $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
+    $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
+  }
+  io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset, $user_data);
+  io_uring_submit($!ring);
 }
 
 =begin pod
