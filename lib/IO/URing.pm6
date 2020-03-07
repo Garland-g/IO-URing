@@ -46,6 +46,26 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     };
   }
 
+  my sub to-read-buf($item is rw) {
+    return $item if $item ~~ Blob;
+    return $item.=encode if $item ~~ Str;
+    $item.=Blob // fail "Don't know how to make $item.^name into a Blob";
+  }
+
+  my sub to-read-bufs(@items) {
+    @items.=map(&to-read-buf);
+  }
+
+  my sub to-write-buf($item) {
+    return $item if $item ~~ Blob;
+    return $item.encode if $item ~~ Str;
+    return $item.Blob // fail "Don't know how to make $item.^name into a Blob";
+  }
+
+  my sub to-write-bufs(@items) {
+    @items.map(&to-write-buf);
+  }
+
   method !submit(io_uring_sqe $sqe is rw, :$chain = False) {
     $sqe.flags +|= INIT {
       $version ~~ v5.3+ && $chain
@@ -66,6 +86,10 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   multi method readv($fd, @bufs, Int :$offset = 0, Int :$user_data = 0, :$chain = False) {
+    self!readv($fd, to-read-bufs(@bufs), :$offset, :$user_data, :$chain);
+  }
+
+  method !readv($fd, @bufs, Int :$offset = 0, Int :$user_data = 0, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
     my $num_vr = @bufs.elems;
     my buf8 $iovecs .= new;
@@ -83,7 +107,12 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   multi method writev($fd, *@bufs, Int :$offset = 0, Int :$user_data = 0, :$chain = False) {
     self.writev($fd, @bufs, :$offset, :$user_data, :$chain);
   }
+
   multi method writev($fd, @bufs, Int :$offset = 0, Int :$user_data = 0, :$chain = False) {
+    self!writev($fd, to-write-bufs(@bufs), :$offset, :$user_data, :$chain);
+  }
+
+  method !writev($fd, @bufs, Int :$offset = 0, Int :$user_data = 0, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
     my $num_vr = @bufs.elems;
     my buf8 $iovecs .= new;
@@ -103,6 +132,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     io_uring_prep_fsync($sqe, $fd.native-descriptor, $flags, $user_data);
     self!submit($sqe, :$chain);
   }
+}
 
 sub EXPORT() {
   my %export = %(
