@@ -1,101 +1,101 @@
+my $real-version = Version.new($*KERNEL.release);
+
+die "Must be loaded on Linux 5.1 or higher"
+  unless $*KERNEL ~~ 'linux' && $real-version ~~ v5.1+;
+
 use NativeCall;
 #use Universal::errno;
 
-constant LIB = "uring";
-
-constant __NR_io_uring_setup = 535;
-constant __NR_io_uring_enter = 536;
-constant __NR_io_uring_register = 537;
+my constant LIB = "uring";
 
 # linux 5.1
-constant IORING_SETUP_IOPOLL = 1;     # (1U << 0)
-constant IORING_SETUP_SQPOLL = 2;     # (1U << 1)
-constant IORING_SETUP_SQ_AFF = 4;     # (1U << 2)
+my constant IORING_SETUP_IOPOLL = 1;     # (1U << 0)
+my constant IORING_SETUP_SQPOLL = 2;     # (1U << 1)
+my constant IORING_SETUP_SQ_AFF = 4;     # (1U << 2)
 # linux 5.5
-constant IORING_SETUP_CQSIZE = 8;     # (1U << 3)
+my constant IORING_SETUP_CQSIZE = 8;     # (1U << 3)
 # linux 5.6
-constant IORING_SETUP_CLAMP = 16;     # (1U << 4)
-constant IORING_SETUP_ATTACH_WQ = 32; # (1U << 5)
+my constant IORING_SETUP_CLAMP = 16;     # (1U << 4)
+my constant IORING_SETUP_ATTACH_WQ = 32; # (1U << 5)
 
 #linux 5.1
-constant IORING_FSYNC_DATASYNC = 1; #fsync_flags
+my constant IORING_FSYNC_DATASYNC = 1; #fsync_flags
 
 #linux 5.5
-constant IORING_TIMEOUT_ABS = 1; #timeout_flags
+my constant IORING_TIMEOUT_ABS = 1; #timeout_flags
 
 #linux 5.1
-constant IORING_OFF_SQ_RING = 0;
-constant IORING_OFF_CQ_RING = 0x8000000;
-constant IORING_OFF_SQES    = 0x10000000;
+my constant IORING_OFF_SQ_RING = 0;
+my constant IORING_OFF_CQ_RING = 0x8000000;
+my constant IORING_OFF_SQES    = 0x10000000;
 
 #linux 5.1
-constant IORING_SQ_NEED_WAKEUP = 1;
+my constant IORING_SQ_NEED_WAKEUP = 1;
 
 # linux 5.1
-constant IOSQE_FIXED_FILE = 1;  # (1U << IOSQE_FIXED_FILE_BIT)
+my constant IOSQE_FIXED_FILE = 1;  # (1U << IOSQE_FIXED_FILE_BIT)
 # linux 5.2
-constant IOSQE_IO_DRAIN = 2;    # (1U << IOSQE_IO_DRAIN_BIT)
+my constant IOSQE_IO_DRAIN = 2;   # (1U << IOSQE_IO_DRAIN_BIT)
 # linux 5.3
-constant IOSQE_IO_LINK = 4;     # (1U << IOSQE_IO_LINK_BIT)
+my constant IOSQE_IO_LINK = 4;     # (1U << IOSQE_IO_LINK_BIT)
 # linux 5.5
-constant IOSQE_IO_HARDLINK = 8; # (1U << IOSQE_IO_HARDLINK_BIT)
+my constant IOSQE_IO_HARDLINK = 8; # (1U << IOSQE_IO_HARDLINK_BIT)
 # linux 5.6
-constant IOSQE_ASYNC = 16;      # (1U << IOSQE_ASYNC_BIT)
+my constant IOSQE_ASYNC = 16;      # (1U << IOSQE_ASYNC_BIT)
 
 #linux 5.6
-constant IOSQE_FIXED_FILE_BIT = 0;
-constant IOSQE_IO_DRAIN_BIT = 1;
-constant IOSQE_IO_LINK_BIT = 2;
-constant IOSQE_IO_HARDLINK_BIT = 3;
-constant IOSQE_ASYNC_BIT = 4;
+my constant IOSQE_FIXED_FILE_BIT = 0;
+my constant IOSQE_IO_DRAIN_BIT = 1;
+my constant IOSQE_IO_LINK_BIT = 2;
+my constant IOSQE_IO_HARDLINK_BIT = 3;
+my constant IOSQE_ASYNC_BIT = 4;
 
 # linux 5.1
-constant IORING_OP_NOP = 0;
-constant IORING_OP_READV = 1;
-constant IORING_OP_WRITEV = 2;
-constant IORING_OP_FSYNC = 3;
-constant IORING_OP_READ_FIXED = 4;
-constant IORING_OP_WRITE_FIXED = 5;
-constant IORING_OP_POLL_ADD = 6;
-constant IORING_OP_POLL_REMOVE = 7;
+my constant IORING_OP_NOP = 0;
+my constant IORING_OP_READV = 1;
+my constant IORING_OP_WRITEV = 2;
+my constant IORING_OP_FSYNC = 3;
+my constant IORING_OP_READ_FIXED = 4;
+my constant IORING_OP_WRITE_FIXED = 5;
+my constant IORING_OP_POLL_ADD = 6;
+my constant IORING_OP_POLL_REMOVE = 7;
 # linux 5.2
-constant IORING_OP_SYNC_FILE_RANGE = 8;
+my constant IORING_OP_SYNC_FILE_RANGE = 8;
 # linux 5.3
-constant IORING_OP_SENDMSG = 9;
-constant IORING_OP_RECVMSG = 10;
+my constant IORING_OP_SENDMSG = 9;
+my constant IORING_OP_RECVMSG = 10;
 # linux 5.4
-constant IORING_OP_TIMEOUT = 11;
+my constant IORING_OP_TIMEOUT = 11;
 # linux 5.5
-constant IORING_OP_TIMEOUT_REMOVE = 12;
-constant IORING_OP_ACCEPT = 13;
-constant IORING_OP_ASYNC_CANCEL = 14;
-constant IORING_OP_LINK_TIMEOUT = 15;
-constant IORING_OP_CONNECT = 16;
+my constant IORING_OP_TIMEOUT_REMOVE = 12;
+my constant IORING_OP_ACCEPT = 13;
+my constant IORING_OP_ASYNC_CANCEL = 14;
+my constant IORING_OP_LINK_TIMEOUT = 15;
+my constant IORING_OP_CONNECT = 16;
 # linux 5.6
-constant IORING_OP_FALLOCATE = 17;
-constant IORING_OP_OPENAT = 18;
-constant IORING_OP_CLOSE = 19;
-constant IORING_OP_FILES_UPDATE = 20;
-constant IORING_OP_STATX = 21;
-constant IORING_OP_READ = 22;
-constant IORING_OP_WRITE = 23;
-constant IORING_OP_FADVISE = 24;
-constant IORING_OP_MADVISE = 25;
-constant IORING_OP_SEND = 26;
-constant IORING_OP_RECV = 27;
-constant IORING_OP_OPENAT2 = 28;
-constant IORING_OP_EPOLL_CTL = 29;
-constant IORING_OP_LAST = 30;
+my constant IORING_OP_FALLOCATE = 17;
+my constant IORING_OP_OPENAT = 18;
+my constant IORING_OP_CLOSE = 19;
+my constant IORING_OP_FILES_UPDATE = 20;
+my constant IORING_OP_STATX = 21;
+my constant IORING_OP_READ = 22;
+my constant IORING_OP_WRITE = 23;
+my constant IORING_OP_FADVISE = 24;
+my constant IORING_OP_MADVISE = 25;
+my constant IORING_OP_SEND = 26;
+my constant IORING_OP_RECV = 27;
+my constant IORING_OP_OPENAT2 = 28;
+my constant IORING_OP_EPOLL_CTL = 29;
 # end
 
-constant IORING_ENTER_GETEVENTS = 1;
-constant IORING_ENTER_SQ_WAKEUP = 2;
+my constant IORING_ENTER_GETEVENTS = 1;
+my constant IORING_ENTER_SQ_WAKEUP = 2;
 
-sub free(Pointer) is native is export { ... }
+sub free(Pointer) is native { ... }
 
 #TODO This class is here for type-safety purposes, but does not function
 # properly. Currently is only being used as a nativecast type target.
-class iovec is repr('CStruct') is rw is export {
+class iovec is repr('CStruct') is rw {
   has Pointer $.iov_base;
   has size_t $.iov_len;
 
@@ -126,12 +126,23 @@ class iovec is repr('CStruct') is rw is export {
   }
 }
 
-class kernel_timespec is repr('CStruct') is rw is export {
+class kernel_timespec is repr('CStruct') is rw {
   has uint64 $tv_sec;
   has uint64 $tv_nsec;
 }
 
-class io_uring_sqe is repr('CStruct') is rw is export {
+class sigset_t is repr('CPointer') {
+  method empty(--> Int) {
+    sigemptyset(self);
+  }
+  method fill(--> Int) {
+    sigfillset(self);
+  }
+  my sub sigemptyset(sigset_t) returns int32 is native { ... }
+  my sub sigfillset(sigset_t) returns int32 is native { ... }
+}
+
+class io_uring_sqe is repr('CStruct') is rw {
   has uint8 $.opcode;   # type of operation
   has uint8 $.flags;    # IOSQE_ flags
   has uint16 $.ioprio;  # ioprio for the request
@@ -209,7 +220,7 @@ class io_uring_sqe is repr('CStruct') is rw is export {
   }
 }
 
-class io_uring_cqe is repr('CStruct') is rw is export {
+class io_uring_cqe is repr('CStruct') is rw {
   has uint64 $.user_data; # data submission passed back
   has int32 $.res;        # result code for this event
   has uint32 $.flags;
@@ -247,7 +258,7 @@ class io_uring_cq is repr('CStruct') {
   has Pointer $.ring_ptr;
 }
 
-class io_uring is repr('CStruct') is export {
+class io_uring is repr('CStruct') {
   HAS io_uring_sq $.sq;
   HAS io_uring_cq $.cq;
   has uint32 $.flags;
@@ -298,33 +309,39 @@ class io_uring_params is repr('CStruct') {
 
 # io_uring_params features flags
 # linux 5.4
-constant IORING_FEAT_SINGLE_MMAP is export = 1;      # 1U << 0
+my constant IORING_FEAT_SINGLE_MMAP = 1;      # 1U << 0
 # linux 5.5
-constant IORING_FEAT_NODROP is export = 2;           # 1U << 1
-constant IORING_FEAT_SUBMIT_STABLE is export = 4;    # 1U << 2
+my constant IORING_FEAT_NODROP = 2;           # 1U << 1
+my constant IORING_FEAT_SUBMIT_STABLE = 4;    # 1U << 2
 # linux 5.6
-constant IORING_FEAT_RW_CUR_POS is export = 8;       # 1U << 3
-constant IORING_FEAT_CUR_PERSONALITY is export = 16; # 1U << 4
+my constant IORING_FEAT_RW_CUR_POS = 8;       # 1U << 3
+my constant IORING_FEAT_CUR_PERSONALITY = 16; # 1U << 4
 #TODO # linux 5.7?
-constant IORING_FEAT_FAST_POLL is export = 32;       # 1U << 5
+#constant IORING_FEAT_FAST_POLL = 32;       # 1U << 5
 
 # io_uring_register opcodes and arguments
-# linux 5.4
-constant IORING_REGISTER_BUFFERS = 0;
-constant IORING_UNREGISTER_BUFFERS = 1;
-constant IORING_REGISTER_FILES = 2;
-constant IORING_UNREGISTER_FILES = 3;
-constant IORING_REGISTER_EVENTFD = 4;
-constant IORING_UNREGISTER_EVENTFD = 5;
+# linux 5.1
+my constant IORING_REGISTER_BUFFERS = 0;
+my constant IORING_UNREGISTER_BUFFERS = 1;
+my constant IORING_REGISTER_FILES = 2;
+my constant IORING_UNREGISTER_FILES = 3;
+# linux 5.2
+my constant IORING_REGISTER_EVENTFD = 4;
+my constant IORING_UNREGISTER_EVENTFD = 5;
 # linux 5.5
-constant IORING_REGISTER_FILES_UPDATE = 6;
-constant IORING_REGISTER_EVENTFD_ASYNC = 7;
+my constant IORING_REGISTER_FILES_UPDATE = 6;
+my constant IORING_REGISTER_EVENTFD_ASYNC = 7;
 # linux 5.6
-constant IORING_REGISTER_PROBE = 8;
-constant IORING_REGISTER_PERSONALITY = 9;
-constant IORING_UNREGISTER_PERSONALITY = 10;
+my constant IORING_REGISTER_PROBE = 8;
+my constant IORING_REGISTER_PERSONALITY = 9;
+my constant IORING_UNREGISTER_PERSONALITY = 10;
 
-multi sub io_uring_queue_init(UInt $entries, io_uring $ring, UInt $flags) returns int32 is export {
+#linux 5.6
+my constant IO_URING_OP_SUPPORTED = 1; # 1U << 0
+
+#sub io_uring_queue_init_params(uint32 $entries, io_uring, io_uring_params) is native(LIB) { ... }
+
+sub io_uring_queue_init(UInt $entries, io_uring $ring, UInt $flags) returns int32 {
   my uint32 $entries-u32 = $entries;
   my uint32 $flags-u32 = $flags;
   my int32 $result = _io_uring_queue_init($entries-u32, $ring, $flags-u32);
@@ -335,11 +352,15 @@ multi sub io_uring_queue_init(UInt $entries, io_uring $ring, UInt $flags) return
   !! $result;
 }
 
-multi sub _io_uring_queue_init(uint32 $entries, io_uring, uint32 $flags) returns int32 is native(LIB) is symbol('io_uring_queue_init') is export(:_io_uring_queue_init) { ... }
+sub _io_uring_queue_init(uint32 $entries, io_uring, uint32 $flags) returns int32
+  is native(LIB) is symbol('io_uring_queue_init') { ... }
 
-sub io_uring_queue_exit(io_uring) is native(LIB) is export { ... }
+#sub io_uring_queue_mmap(int32 $fd, io_uring_params, io_uring) is native(LIB) { ... }
 
-multi sub io_uring_submit(|c) returns int32 is export {
+#sub io_uring_ring_dontfork(io_uring) is native(LIB) { ... }
+sub io_uring_queue_exit(io_uring) is native(LIB) { ... }
+
+sub io_uring_submit(|c) returns int32 {
   my int32 $result = _io_uring_submit(|c);
   return $result != 1
   ?? do {
@@ -348,11 +369,11 @@ multi sub io_uring_submit(|c) returns int32 is export {
   !! $result
 }
 
-multi sub _io_uring_submit(io_uring --> int32) is native(LIB) is symbol('io_uring_submit') is export(:_io_uring_queue_init) { ... }
+sub _io_uring_submit(io_uring --> int32) is native(LIB) is symbol('io_uring_submit') { ... }
 
-multi sub _io_uring_submit_and_wait(io_uring, uint32 $wait_nr) is native(LIB) is symbol('io_uring_submit_and_wait') { ... }
+sub _io_uring_submit_and_wait(io_uring, uint32 $wait_nr) is native(LIB) is symbol('io_uring_submit_and_wait') { ... }
 
-multi sub io_uring_submit_and_wait(|c) is export {
+sub io_uring_submit_and_wait(|c) {
   my int32 $result = _io_uring_submit_and_wait(|c);
   return $result < 0
   ?? do {
@@ -361,9 +382,20 @@ multi sub io_uring_submit_and_wait(|c) is export {
   !! $result
 }
 
-multi sub _io_uring_wait_cqe_timeout(io_uring, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32 is native(LIB) is symbol('io_uring_wait_cqe_timeout') is export(:_io_uring_wait_cqe_timeout) { ... }
+#sub io_uring_peek_batch_cqe(io_uring, Pointer[io_uring_cqe] is rw, uint32 $count) returns uint32 is native(LIB) { ... }
 
-multi sub io_uring_wait_cqe_timeout(|c) returns int32 is export {
+#multi sub io_uring_wait_cqes(io_uring, io_uring_cqe is rw, kernel_timespec, sigset_t --> int32) is native(LIB) { ... }
+
+#multi sub io_uring_wait_cqes(io_uring $ring, io_uring_cqe $sqe is rw, kernel_timespec $ts --> int32) {
+#  my sigset_t $set .= new;
+#  $set.fill;
+#  io_uring_wait_cqes($ring, $sqe, $ts, $set);
+#}
+
+sub _io_uring_wait_cqe_timeout(io_uring, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32
+  is native(LIB) is symbol('io_uring_wait_cqe_timeout') { ... }
+
+sub io_uring_wait_cqe_timeout(|c) returns int32 {
   my int32 $result = _io_uring_wait_cqe_timeout(|c);
   return $result != 0
   ?? do {
@@ -372,13 +404,13 @@ multi sub io_uring_wait_cqe_timeout(|c) returns int32 is export {
   !! $result
 }
 
-sub io_uring_get_sqe(io_uring) returns io_uring_sqe is native(LIB) is symbol('io_uring_get_sqe') is export { ... }
+sub io_uring_get_sqe(io_uring) returns io_uring_sqe is native(LIB) { ... }
 
-sub io_uring_wait_cqe(|c) is export {
+sub io_uring_wait_cqe(|c) {
   return io_uring_wait_cqe_timeout(|c, kernel_timespec);
 }
 
-sub io_uring_advance(io_uring $ring, uint32 $nr) is export {
+sub io_uring_advance(io_uring $ring, uint32 $nr) {
   if ($nr) {
     my io_uring_cq $cq = $ring.cq;
     repeat {
@@ -388,7 +420,7 @@ sub io_uring_advance(io_uring $ring, uint32 $nr) is export {
   }
 }
 
-sub io_uring_cqe_seen(io_uring $ring, io_uring_cqe $cqe) is export {
+sub io_uring_cqe_seen(io_uring $ring, io_uring_cqe $cqe) {
   io_uring_advance($ring, 1) if ($cqe);
 }
 
@@ -405,20 +437,129 @@ sub io_uring_prep_rw(Int \op, io_uring_sqe $sqe, Int \fd, $addr, Int \len, Int \
   $sqe.pad0 = $sqe.pad1 = $sqe.pad2 = 0;
 }
 
-sub io_uring_prep_nop(io_uring_sqe $sqe, $user_data = 0) is export {
+sub io_uring_prep_nop(io_uring_sqe $sqe, $user_data = 0) {
   io_uring_prep_rw(IORING_OP_NOP, $sqe, -1, Pointer, 0, 0);
   $sqe.user_data = $user_data if $user_data;
 }
 
-sub io_uring_prep_readv(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset, Int $user_data = 0) is export {
+sub io_uring_prep_readv(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset, Int $user_data = 0) {
   io_uring_prep_rw(IORING_OP_READV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
   $sqe.user_data = $user_data if $user_data;
 }
 
-sub io_uring_prep_writev(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset, Int $user_data = 0) is export {
+sub io_uring_prep_writev(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset, Int $user_data = 0) {
   io_uring_prep_rw(IORING_OP_WRITEV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
   $sqe.user_data = $user_data if $user_data;
 }
 
-sub io_uring_cqe_get_data(io_uring_cqe $cqe --> Pointer) is export { Pointer[void].new(+$cqe.user_data) }
+sub io_uring_prep_fsync(io_uring_sqe $sqe, $fd, UInt $fsync_flags, Int $user_data = 0) {
+  io_uring_prep_rw(IORING_OP_FSYNC, $sqe, $fd, Str, 0, 0);
+  $sqe.user_data = $user_data if $user_data;
+  $sqe.union-flags = $fsync_flags;
+}
 
+#multi sub io_uring_register_files(io_uring, Pointer[int32] $files, uint32 $num_files) returns int32 is native(LIB) { ... }
+
+#multi sub io_uring_register_files(io_uring $ring, @files where .all.^can("native-descriptor"), uint32 $num_files) returns int32 {
+#  my $arr = CArray[int32].new;
+#  my $count = @files.elems;
+#  for @files Z ^Inf -> $file, $i {
+#    $arr[$i] = $file.native-descriptor;
+#  }
+#  io_uring_register_files($ring, nativecast(Pointer[int32], $arr), $count);
+#}
+
+sub io_uring_cqe_get_data(io_uring_cqe $cqe --> Pointer) { Pointer[void].new(+$cqe.user_data) }
+
+# Older versions of the kernel can crash when attempting to use features
+# that are from later versions. Control EXPORT to prevent that.
+sub EXPORT($version = $real-version ) {
+  my %base = (
+    'IORING_SETUP_IOPOLL' => IORING_SETUP_IOPOLL,
+    'IORING_SETUP_SQPOLL' => IORING_SETUP_SQPOLL,
+    'IORING_SETUP_SQ_AFF' => IORING_SETUP_SQ_AFF,
+    'IORING_FSYNC_DATASYNC' => IORING_FSYNC_DATASYNC,
+    'IORING_SQ_NEED_WAKEUP' => IORING_SQ_NEED_WAKEUP,
+    'IORING_OP_NOP' => IORING_OP_NOP,
+    'IORING_OP_READV' => IORING_OP_READV,
+    'IORING_OP_WRITEV' => IORING_OP_WRITEV,
+    'IORING_OP_FSYNC' => IORING_OP_FSYNC,
+    'IORING_OP_READ_FIXED' => IORING_OP_READ_FIXED,
+    'IORING_OP_WRITE_FIXED' => IORING_OP_WRITE_FIXED,
+    'IORING_OP_POLL_ADD' => IORING_OP_POLL_ADD,
+    'IORING_OP_POLL_REMOVE' => IORING_OP_POLL_REMOVE,
+    'IORING_REGISTER_BUFFERS' => IORING_REGISTER_BUFFERS,
+    'IORING_UNREGISTER_BUFFERS' => IORING_UNREGISTER_BUFFERS,
+    'IORING_REGISTER_FILES' => IORING_REGISTER_FILES,
+    'IORING_UNREGISTER_FILES' => IORING_UNREGISTER_FILES,
+    'IOSQE_FIXED_FILE' => IOSQE_FIXED_FILE,
+    'io_uring' => io_uring,
+    'io_uring_cqe' => io_uring_cqe,
+    'io_uring_sqe' => io_uring_sqe,
+    '&io_uring_queue_init' => &io_uring_queue_init,
+    '&io_uring_queue_exit' => &io_uring_queue_exit,
+    '&io_uring_get_sqe' => &io_uring_get_sqe,
+    '&io_uring_cqe_seen' => &io_uring_cqe_seen,
+    '&io_uring_submit' => &io_uring_submit,
+    '&io_uring_wait_cqe_timeout' => &io_uring_wait_cqe_timeout,
+    '&io_uring_wait_cqe' => &io_uring_wait_cqe,
+    '&io_uring_prep_nop' => &io_uring_prep_nop,
+    '&io_uring_prep_readv' => &io_uring_prep_readv,
+    '&io_uring_prep_writev' => &io_uring_prep_writev,
+    '&io_uring_prep_fsync' => &io_uring_prep_fsync,
+  );
+  if $version ~~ v5.2+ {
+    %base<IOSQE_IO_DRAIN> = IOSQE_IO_DRAIN;
+    %base<IORING_OP_SYNC_FILE_RANGE> = IORING_OP_SYNC_FILE_RANGE;
+    %base<IORING_REGISTER_EVENTFD> = IORING_REGISTER_EVENTFD;
+    %base<IORING_UNREGISTER_EVENTFD> = IORING_UNREGISTER_EVENTFD;
+  }
+  if $version ~~ v5.3+ {
+    %base<IOSQE_IO_LINK> = IOSQE_IO_LINK;
+    %base<IORING_OP_SENDMSG> = IORING_OP_SENDMSG;
+    %base<IORING_OP_RECVMSG> = IORING_OP_RECVMSG;
+  }
+  if $version ~~ v5.4+ {
+    %base<IORING_OP_TIMEOUT> = IORING_OP_TIMEOUT;
+    %base<IORING_FEAT_SINGLE_MMAP> = IORING_FEAT_SINGLE_MMAP;
+  }
+  if $version ~~ v5.5+ {
+    %base<IORING_FEAT_NODROP> = IORING_FEAT_NODROP;
+    %base<IORING_FEAT_SUBMIT_STABLE> = IORING_FEAT_SUBMIT_STABLE;
+    %base<IORING_SETUP_CQSIZE> = IORING_SETUP_CQSIZE;
+    %base<IORING_TIMEOUT_ABS> = IORING_TIMEOUT_ABS;
+    %base<IOSQE_IO_HARDLINK> = IOSQE_IO_HARDLINK;
+    %base<IORING_OP_TIMEOUT_REMOVE> = IORING_OP_TIMEOUT_REMOVE;
+    %base<IORING_OP_ACCEPT> = IORING_OP_ACCEPT;
+    %base<IORING_OP_ASYNC_CANCEL> = IORING_OP_ASYNC_CANCEL;
+    %base<IORING_OP_LINK_TIMEOUT> = IORING_OP_LINK_TIMEOUT;
+    %base<IORING_OP_CONNECT> = IORING_OP_CONNECT;
+    %base<IORING_REGISTER_FILES_UPDATE> = IORING_REGISTER_FILES_UPDATE;
+    %base<IORING_REGISTER_EVENTFD_ASYNC> = IORING_REGISTER_EVENTFD_ASYNC;
+  }
+  if $version ~~ v5.6+ {
+    %base<IORING_SETUP_CLAMP> = IORING_SETUP_CLAMP;
+    %base<IORING_SETUP_ATTACH_WQ> = IORING_SETUP_ATTACH_WQ;
+    %base<IOSQE_ASYNC> = IOSQE_ASYNC;
+    %base<IOSQE_FIXED_FILE_BIT> = IOSQE_FIXED_FILE_BIT;
+    %base<IOSQE_IO_DRAIN_BIT> = IOSQE_IO_DRAIN_BIT;
+    %base<IOSQE_IO_LINK_BIT> = IOSQE_IO_LINK_BIT;
+    %base<IOSQE_IO_HARDLINK_BIT> = IOSQE_IO_HARDLINK_BIT;
+    %base<IOSQE_ASYNC_BIT> = IOSQE_ASYNC_BIT;
+    %base<IORING_OP_FALLOCATE> = IORING_OP_FALLOCATE;
+    %base<IORING_OP_OPENAT> = IORING_OP_OPENAT;
+    %base<IORING_OP_CLOSE> = IORING_OP_CLOSE;
+    %base<IORING_OP_FILES_UPDATE> = IORING_OP_FILES_UPDATE;
+    %base<IORING_OP_STATX> = IORING_OP_STATX;
+    %base<IORING_OP_READ> = IORING_OP_READ;
+    %base<IORING_OP_WRITE> = IORING_OP_WRITE;
+    %base<IORING_OP_FADVISE> = IORING_OP_FADVISE;
+    %base<IORING_OP_MADVISE> = IORING_OP_MADVISE;
+    %base<IORING_OP_SEND> = IORING_OP_SEND;
+    %base<IORING_OP_RECV> = IORING_OP_RECV;
+    %base<IORING_OP_OPENAT2> = IORING_OP_OPENAT2;
+    %base<IORING_OP_EPOLL_CTL> = IORING_OP_EPOLL_CTL;
+  }
+  %base<%IO_URING_RAW_EXPORT> = %base;
+  %base;
+}
