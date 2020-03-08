@@ -25,7 +25,6 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       +| ($version ~~ v5.5+ ?? $::('IORING_FEAT_NODROP') +| $::('IORING_FEAT_SUBMIT_STABLE') !! 0)
     }
   ) {
-    $!storage-lock.protect: { @!storage[$entries * 2 - 1] = Nil }
     io_uring_queue_init($entries, $!ring, $flags);
     start {
       loop {
@@ -83,17 +82,13 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   method !store($user_data --> Int) {
-    my $slot;
+    # Skip the first slot to have a "slot" for Nil user data
+    my Int $slot = 1;
     $!storage-lock.protect: {
-      for 0..^@!storage.elems -> Int $i {
-        if @!storage[$i] ~~ STORAGE::EMPTY {
-          @!storage[$i] = $user_data;
-          $slot = $i;
-          last;
-        }
-      }
+      until @!storage[$slot] ~~ STORAGE::EMPTY { $slot++; }
+      @!storage[$slot] = $user_data;
     };
-    $slot // fail "Could not store data";
+    $slot
   }
 
   method !retrieve(Int $slot) {
@@ -116,7 +111,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   method nop(:$data = 0, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    my Int $user_data = self!store($data);
+    my Int $user_data = $data.defined ?? self!store($data) !! Int;
     io_uring_prep_nop($sqe, $user_data);
     self!submit($sqe, :$chain);
   }
@@ -140,7 +135,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
       $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
     }
-    my Int $user_data = self!store($data);
+    my Int $user_data = $data.defined ?? self!store($data) !! Int;
     io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset, $user_data);
     self!submit($sqe, :$chain);
   }
@@ -164,14 +159,14 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
       $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
     }
-    my Int $user_data = self!store($data);
+    my Int $user_data = $data.defined ?? self!store($data) !! Int;
     io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset, $user_data);
     self!submit($sqe, :$chain);
   }
 
   method fsync($fd, Int $flags, :$data = 0, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    my Int $user_data = self!store($data) if $data;
+    my Int $user_data = $data.defined ?? self!store($data) !! Int;
     io_uring_prep_fsync($sqe, $fd.native-descriptor, $flags, $user_data);
     self!submit($sqe, :$chain);
   }
