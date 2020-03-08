@@ -437,22 +437,22 @@ sub io_uring_prep_rw(Int \op, io_uring_sqe $sqe, Int \fd, $addr, Int \len, Int \
   $sqe.pad0 = $sqe.pad1 = $sqe.pad2 = 0;
 }
 
-sub io_uring_prep_nop(io_uring_sqe $sqe, $user_data = 0) {
+sub io_uring_prep_nop(io_uring_sqe $sqe, Int $user_data --> Nil) {
   io_uring_prep_rw(IORING_OP_NOP, $sqe, -1, Pointer, 0, 0);
   $sqe.user_data = $user_data if $user_data;
 }
 
-sub io_uring_prep_readv(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset, Int $user_data = 0) {
+sub io_uring_prep_readv(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset, Int $user_data --> Nil) {
   io_uring_prep_rw(IORING_OP_READV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
   $sqe.user_data = $user_data if $user_data;
 }
 
-sub io_uring_prep_writev(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset, Int $user_data = 0) {
+sub io_uring_prep_writev(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset, Int $user_data --> Nil) {
   io_uring_prep_rw(IORING_OP_WRITEV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
   $sqe.user_data = $user_data if $user_data;
 }
 
-sub io_uring_prep_fsync(io_uring_sqe $sqe, $fd, UInt $fsync_flags, Int $user_data = 0) {
+sub io_uring_prep_fsync(io_uring_sqe $sqe, $fd, UInt $fsync_flags, Int $user_data --> Nil) {
   io_uring_prep_rw(IORING_OP_FSYNC, $sqe, $fd, Str, 0, 0);
   $sqe.user_data = $user_data if $user_data;
   $sqe.union-flags = $fsync_flags;
