@@ -61,24 +61,24 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     };
   }
 
-  my sub to-read-buf($item is rw) {
+  my sub to-read-buf($item is rw, :$enc) {
     return $item if $item ~~ Blob;
-    return $item.=encode if $item ~~ Str;
+    return $item = $item.encode($enc) if $item ~~ Str;
     $item = $item.Blob // fail "Don't know how to make $item.^name into a Blob";
   }
 
-  my sub to-read-bufs(@items) {
-    @items.=map(&to-read-buf);
+  my sub to-read-bufs(@items, :$enc) {
+    @items .= map(&to-read-buf, :$enc);
   }
 
-  my sub to-write-buf($item) {
+  my sub to-write-buf($item, :$enc) {
     return $item if $item ~~ Blob;
-    return $item.encode if $item ~~ Str;
+    return $item.encode($enc) if $item ~~ Str;
     return $item.Blob // fail "Don't know how to make $item.^name into a Blob";
   }
 
-  my sub to-write-bufs(@items) {
-    @items.map(&to-write-buf);
+  my sub to-write-bufs(@items, :$enc) {
+    @items.map(&to-write-buf, :$enc);
   }
 
   method !store($user_data --> Int) {
@@ -140,12 +140,12 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self!submit($sqe, :$chain);
   }
 
-  multi method writev($fd, *@bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
-    self.writev($fd, @bufs, :$offset, :$data, :$chain);
+  multi method writev($fd, *@bufs, Int :$offset = 0, :$data = 0, :$enc = 'utf-8', :$chain = False) {
+    self.writev($fd, @bufs, :$offset, :$data, :$enc, :$chain);
   }
 
-  multi method writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
-    self!writev($fd, to-write-bufs(@bufs), :$offset, :$data, :$chain);
+  multi method writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$enc = 'utf-8', :$chain = False) {
+    self!writev($fd, to-write-bufs(@bufs, :$enc), :$offset, :$data, :$chain);
   }
 
   method !writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
