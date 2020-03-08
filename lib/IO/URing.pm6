@@ -138,9 +138,7 @@ sub EXPORT() {
   my %export = %(
     'IO::URing' => IO::URing,
   );
-  my %raw = %IO_URING_RAW_EXPORT;
-  %raw<%IO_URING_RAW_EXPORT>:delete;
-  %export.append(%raw);
+  %export.append(%IO_URING_RAW_EXPORT);
   %export
 }
 

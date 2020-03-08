@@ -474,7 +474,7 @@ sub io_uring_cqe_get_data(io_uring_cqe $cqe --> Pointer) { Pointer[void].new(+$c
 # Older versions of the kernel can crash when attempting to use features
 # that are from later versions. Control EXPORT to prevent that.
 sub EXPORT($version = $real-version ) {
-  my %base = (
+  my %constants = %(
     'IORING_SETUP_IOPOLL' => IORING_SETUP_IOPOLL,
     'IORING_SETUP_SQPOLL' => IORING_SETUP_SQPOLL,
     'IORING_SETUP_SQ_AFF' => IORING_SETUP_SQ_AFF,
@@ -493,9 +493,15 @@ sub EXPORT($version = $real-version ) {
     'IORING_REGISTER_FILES' => IORING_REGISTER_FILES,
     'IORING_UNREGISTER_FILES' => IORING_UNREGISTER_FILES,
     'IOSQE_FIXED_FILE' => IOSQE_FIXED_FILE,
+  );
+  my %types = %(
+  );
+  my %export-types = %(
     'io_uring' => io_uring,
     'io_uring_cqe' => io_uring_cqe,
     'io_uring_sqe' => io_uring_sqe,
+  );
+  my %subs = %(
     '&io_uring_queue_init' => &io_uring_queue_init,
     '&io_uring_queue_exit' => &io_uring_queue_exit,
     '&io_uring_get_sqe' => &io_uring_get_sqe,
@@ -509,57 +515,58 @@ sub EXPORT($version = $real-version ) {
     '&io_uring_prep_fsync' => &io_uring_prep_fsync,
   );
   if $version ~~ v5.2+ {
-    %base<IOSQE_IO_DRAIN> = IOSQE_IO_DRAIN;
-    %base<IORING_OP_SYNC_FILE_RANGE> = IORING_OP_SYNC_FILE_RANGE;
-    %base<IORING_REGISTER_EVENTFD> = IORING_REGISTER_EVENTFD;
-    %base<IORING_UNREGISTER_EVENTFD> = IORING_UNREGISTER_EVENTFD;
+    %constants<IOSQE_IO_DRAIN> = IOSQE_IO_DRAIN;
+    %constants<IORING_OP_SYNC_FILE_RANGE> = IORING_OP_SYNC_FILE_RANGE;
+    %constants<IORING_REGISTER_EVENTFD> = IORING_REGISTER_EVENTFD;
+    %constants<IORING_UNREGISTER_EVENTFD> = IORING_UNREGISTER_EVENTFD;
   }
   if $version ~~ v5.3+ {
-    %base<IOSQE_IO_LINK> = IOSQE_IO_LINK;
-    %base<IORING_OP_SENDMSG> = IORING_OP_SENDMSG;
-    %base<IORING_OP_RECVMSG> = IORING_OP_RECVMSG;
+    %constants<IOSQE_IO_LINK> = IOSQE_IO_LINK;
+    %constants<IORING_OP_SENDMSG> = IORING_OP_SENDMSG;
+    %constants<IORING_OP_RECVMSG> = IORING_OP_RECVMSG;
   }
   if $version ~~ v5.4+ {
-    %base<IORING_OP_TIMEOUT> = IORING_OP_TIMEOUT;
-    %base<IORING_FEAT_SINGLE_MMAP> = IORING_FEAT_SINGLE_MMAP;
+    %constants<IORING_OP_TIMEOUT> = IORING_OP_TIMEOUT;
+    %constants<IORING_FEAT_SINGLE_MMAP> = IORING_FEAT_SINGLE_MMAP;
   }
   if $version ~~ v5.5+ {
-    %base<IORING_FEAT_NODROP> = IORING_FEAT_NODROP;
-    %base<IORING_FEAT_SUBMIT_STABLE> = IORING_FEAT_SUBMIT_STABLE;
-    %base<IORING_SETUP_CQSIZE> = IORING_SETUP_CQSIZE;
-    %base<IORING_TIMEOUT_ABS> = IORING_TIMEOUT_ABS;
-    %base<IOSQE_IO_HARDLINK> = IOSQE_IO_HARDLINK;
-    %base<IORING_OP_TIMEOUT_REMOVE> = IORING_OP_TIMEOUT_REMOVE;
-    %base<IORING_OP_ACCEPT> = IORING_OP_ACCEPT;
-    %base<IORING_OP_ASYNC_CANCEL> = IORING_OP_ASYNC_CANCEL;
-    %base<IORING_OP_LINK_TIMEOUT> = IORING_OP_LINK_TIMEOUT;
-    %base<IORING_OP_CONNECT> = IORING_OP_CONNECT;
-    %base<IORING_REGISTER_FILES_UPDATE> = IORING_REGISTER_FILES_UPDATE;
-    %base<IORING_REGISTER_EVENTFD_ASYNC> = IORING_REGISTER_EVENTFD_ASYNC;
+    %constants<IORING_FEAT_NODROP> = IORING_FEAT_NODROP;
+    %constants<IORING_FEAT_SUBMIT_STABLE> = IORING_FEAT_SUBMIT_STABLE;
+    %constants<IORING_SETUP_CQSIZE> = IORING_SETUP_CQSIZE;
+    %constants<IORING_TIMEOUT_ABS> = IORING_TIMEOUT_ABS;
+    %constants<IOSQE_IO_HARDLINK> = IOSQE_IO_HARDLINK;
+    %constants<IORING_OP_TIMEOUT_REMOVE> = IORING_OP_TIMEOUT_REMOVE;
+    %constants<IORING_OP_ACCEPT> = IORING_OP_ACCEPT;
+    %constants<IORING_OP_ASYNC_CANCEL> = IORING_OP_ASYNC_CANCEL;
+    %constants<IORING_OP_LINK_TIMEOUT> = IORING_OP_LINK_TIMEOUT;
+    %constants<IORING_OP_CONNECT> = IORING_OP_CONNECT;
+    %constants<IORING_REGISTER_FILES_UPDATE> = IORING_REGISTER_FILES_UPDATE;
+    %constants<IORING_REGISTER_EVENTFD_ASYNC> = IORING_REGISTER_EVENTFD_ASYNC;
   }
   if $version ~~ v5.6+ {
-    %base<IORING_SETUP_CLAMP> = IORING_SETUP_CLAMP;
-    %base<IORING_SETUP_ATTACH_WQ> = IORING_SETUP_ATTACH_WQ;
-    %base<IOSQE_ASYNC> = IOSQE_ASYNC;
-    %base<IOSQE_FIXED_FILE_BIT> = IOSQE_FIXED_FILE_BIT;
-    %base<IOSQE_IO_DRAIN_BIT> = IOSQE_IO_DRAIN_BIT;
-    %base<IOSQE_IO_LINK_BIT> = IOSQE_IO_LINK_BIT;
-    %base<IOSQE_IO_HARDLINK_BIT> = IOSQE_IO_HARDLINK_BIT;
-    %base<IOSQE_ASYNC_BIT> = IOSQE_ASYNC_BIT;
-    %base<IORING_OP_FALLOCATE> = IORING_OP_FALLOCATE;
-    %base<IORING_OP_OPENAT> = IORING_OP_OPENAT;
-    %base<IORING_OP_CLOSE> = IORING_OP_CLOSE;
-    %base<IORING_OP_FILES_UPDATE> = IORING_OP_FILES_UPDATE;
-    %base<IORING_OP_STATX> = IORING_OP_STATX;
-    %base<IORING_OP_READ> = IORING_OP_READ;
-    %base<IORING_OP_WRITE> = IORING_OP_WRITE;
-    %base<IORING_OP_FADVISE> = IORING_OP_FADVISE;
-    %base<IORING_OP_MADVISE> = IORING_OP_MADVISE;
-    %base<IORING_OP_SEND> = IORING_OP_SEND;
-    %base<IORING_OP_RECV> = IORING_OP_RECV;
-    %base<IORING_OP_OPENAT2> = IORING_OP_OPENAT2;
-    %base<IORING_OP_EPOLL_CTL> = IORING_OP_EPOLL_CTL;
+    %constants<IORING_SETUP_CLAMP> = IORING_SETUP_CLAMP;
+    %constants<IORING_SETUP_ATTACH_WQ> = IORING_SETUP_ATTACH_WQ;
+    %constants<IOSQE_ASYNC> = IOSQE_ASYNC;
+    %constants<IOSQE_FIXED_FILE_BIT> = IOSQE_FIXED_FILE_BIT;
+    %constants<IOSQE_IO_DRAIN_BIT> = IOSQE_IO_DRAIN_BIT;
+    %constants<IOSQE_IO_LINK_BIT> = IOSQE_IO_LINK_BIT;
+    %constants<IOSQE_IO_HARDLINK_BIT> = IOSQE_IO_HARDLINK_BIT;
+    %constants<IOSQE_ASYNC_BIT> = IOSQE_ASYNC_BIT;
+    %constants<IORING_OP_FALLOCATE> = IORING_OP_FALLOCATE;
+    %constants<IORING_OP_OPENAT> = IORING_OP_OPENAT;
+    %constants<IORING_OP_CLOSE> = IORING_OP_CLOSE;
+    %constants<IORING_OP_FILES_UPDATE> = IORING_OP_FILES_UPDATE;
+    %constants<IORING_OP_STATX> = IORING_OP_STATX;
+    %constants<IORING_OP_READ> = IORING_OP_READ;
+    %constants<IORING_OP_WRITE> = IORING_OP_WRITE;
+    %constants<IORING_OP_FADVISE> = IORING_OP_FADVISE;
+    %constants<IORING_OP_MADVISE> = IORING_OP_MADVISE;
+    %constants<IORING_OP_SEND> = IORING_OP_SEND;
+    %constants<IORING_OP_RECV> = IORING_OP_RECV;
+    %constants<IORING_OP_OPENAT2> = IORING_OP_OPENAT2;
+    %constants<IORING_OP_EPOLL_CTL> = IORING_OP_EPOLL_CTL;
   }
-  %base<%IO_URING_RAW_EXPORT> = %base;
+  my %base = %(|%constants, |%types, |%subs, |%export-types);
+  %base<%IO_URING_RAW_EXPORT> = %(|%constants, |%types);
   %base;
 }
