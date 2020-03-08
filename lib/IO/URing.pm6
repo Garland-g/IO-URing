@@ -7,9 +7,17 @@ my $version = Version.new($*KERNEL.release);
 class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   my enum STORAGE <EMPTY>;
 
+  my class Completion {
+    has $.data;
+    has Int $.result;
+    has Int $.flags;
+  }
+
   has io_uring $!ring .= new;
   has Lock::Async $!storage-lock .= new;
   has @!storage is default(STORAGE::EMPTY);
+  has Supplier $!supplier .= new;
+  has Supply $!supply;
 
   submethod TWEAK(UInt :$entries,
     UInt :$flags = INIT { 0
@@ -19,19 +27,39 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   ) {
     $!storage-lock.protect: { @!storage[$entries * 2 - 1] = Nil }
     io_uring_queue_init($entries, $!ring, $flags);
-    #start {
-      #  loop {
-        #  my Pointer[io_uring_cqe] $cqe_ptr .= new;
-        #io_uring_wait_cqe($!ring, $cqe_ptr);
-        #my io_uring_cqe $temp = $cqe_ptr.deref.clone;
-        #$!supplier.emit($temp);
-        #io_uring_cqe_seen($!ring, $cqe_ptr.deref);
-        #}
-        #}
+    start {
+      loop {
+        my Pointer[io_uring_cqe] $cqe_ptr .= new;
+        io_uring_wait_cqe($!ring, $cqe_ptr);
+        my io_uring_cqe $temp := $cqe_ptr.deref;
+        my $cmp = Completion.new(
+          :data(self!retrieve($temp.user_data)),
+          :result($temp.res),
+          :flags($temp.flags),
+        );
+        io_uring_cqe_seen($!ring, $cqe_ptr.deref.clone);
+        $!supplier.emit($cmp);
+      }
+      CATCH {
+        default {
+          die $_;
+        }
+      }
+    }
   }
 
   submethod DESTROY() {
     io_uring_queue_exit($!ring);
+  }
+
+  method Supply {
+    $!supply //= do {
+      supply {
+        whenever $!supplier -> $cqe {
+          emit $cqe;
+        }
+      }
+    };
   }
 
   my sub to-read-buf($item is rw) {
@@ -86,50 +114,22 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     io_uring_submit($!ring);
   }
 
-  my class Completion {
-    has $.data;
-    has Int $.result;
-    has Int $.flags;
-  }
-
-  method !Promise(:$chain = False --> Promise) {
-    start {
-      if $chain {
-        self;
-      }
-      else {
-        my Pointer[io_uring_cqe] $cqe_ptr .= new;
-        io_uring_wait_cqe($!ring, $cqe_ptr);
-        my io_uring_cqe $temp := $cqe_ptr.deref;
-        my $data = self!retrieve($temp.user_data);
-        my $ret = Completion.new(
-          :data($data),
-          :result($temp.res),
-          :flags($temp.flags)
-        );
-        io_uring_cqe_seen($!ring, $cqe_ptr.deref);
-        $ret;
-      }
-    }
-  }
-
-  method nop(:$data = 0, :$chain = False --> Promise) {
+  method nop(:$data = 0, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    my $user_data = self!store($data);
+    my Int $user_data = self!store($data);
     io_uring_prep_nop($sqe, $user_data);
     self!submit($sqe, :$chain);
-    self!Promise(:$chain);
   }
 
-  multi method readv($fd, *@bufs, Int :$offset = 0, :$data = 0, :$chain = False --> Promise) {
+  multi method readv($fd, *@bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
     self.readv($fd, @bufs, :$offset, :$data, :$chain);
   }
 
-  multi method readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False --> Promise) {
+  multi method readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
     self!readv($fd, to-read-bufs(@bufs), :$offset, :$data, :$chain);
   }
 
-  method !readv($fd, @bufs, Int :$offset = 0, :$data, :$chain = False --> Promise) {
+  method !readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
     my $num_vr = @bufs.elems;
     my buf8 $iovecs .= new;
@@ -137,26 +137,23 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     for ^$num_vr -> $num {
       #TODO Fix when nativecall gets better.
       # Hack together array of struct iovec from definition
-      $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num]));
-      $pos += 8;
-      $iovecs.write-uint64($pos, @bufs[$num].elems);
-      $pos += 8;
+      $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
+      $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
     }
-    my $user_data = self!store($data);
+    my Int $user_data = self!store($data);
     io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset, $user_data);
     self!submit($sqe, :$chain);
-    self!Promise(:$chain);
   }
 
-  multi method writev($fd, *@bufs, Int :$offset = 0, :$data = 0, :$chain = False --> Promise) {
+  multi method writev($fd, *@bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
     self.writev($fd, @bufs, :$offset, :$data, :$chain);
   }
 
-  multi method writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False --> Promise) {
+  multi method writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
     self!writev($fd, to-write-bufs(@bufs), :$offset, :$data, :$chain);
   }
 
-  method !writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False --> Promise) {
+  method !writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
     my $num_vr = @bufs.elems;
     my buf8 $iovecs .= new;
@@ -164,23 +161,19 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     for ^$num_vr -> $num {
       #TODO Fix when nativecall gets better.
       # Hack together array of struct iovec from definition
-      $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num]));
-      $pos += 8;
-      $iovecs.write-uint64($pos, @bufs[$num].elems);
-      $pos += 8;
+      $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
+      $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
     }
-    my $user_data = self!store($data);
+    my Int $user_data = self!store($data);
     io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset, $user_data);
     self!submit($sqe, :$chain);
-    self!Promise(:$chain);
   }
 
-  method fsync($fd, Int $flags, :$data = 0, :$chain = False --> Promise) {
+  method fsync($fd, Int $flags, :$data = 0, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    my $user_data = self!store($data) if $data;
+    my Int $user_data = self!store($data) if $data;
     io_uring_prep_fsync($sqe, $fd.native-descriptor, $flags, $user_data);
     self!submit($sqe, :$chain);
-    self!Promise;
   }
 }
 
@@ -207,8 +200,17 @@ Sample NOP call
 use IO::URing;
 
 my IO::URing $ring .= new(:8entries, :0flags);
-my $cqe = await $ring.nop(1);
-say $cqe.user_data;
+start {
+  sleep 0.1
+  $ring.nop(1);
+}
+react {
+  whenever signal(SIGINT) {
+    say "done"; exit;
+  }
+  whenever $ring.Supply -> $data {
+    say "data: {$data.raku}";
+  }
 }
 
 =end code

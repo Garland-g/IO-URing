@@ -6,15 +6,23 @@ my IO::URing $ring .= new(:2entries, :0flags);
 
 # Random values to prove that no cheating is happening
 my @test-val = (^1000).pick(3);
-my @promises;
 
-for @test-val -> $val {
-  @promises.push($ring.nop(:data($val)));
+start {
+  sleep 0.05;
+  for @test-val -> $val {
+    $ring.nop(:data($val));
+  }
 }
-my @results = await Promise.allof(@promises);
 
-for @promises>>.result Z @test-val -> ($val, $test-val) {
-  is $val.data, $test-val, "Get val {$val.data} back from kernel";
+my $count = 0;
+
+react {
+  whenever $ring.Supply -> $cqe {
+    is $cqe.data, @test-val[$count], "Get val {$cqe.data} back from kernel";
+
+    $count++;
+    done if $count == @test-val.elems;
+  }
 }
 
 
