@@ -17,10 +17,32 @@ $wbuf2 = $val.encode.subbuf(5..^10);
 $rbuf1 = blob8.allocate(5);
 $rbuf2 = blob8.allocate(5);
 
+# Emulates chain for kernel versions that don't have it.
+
 start {
   sleep 0.05;
   $ring.writev($handle, ($wbuf1, $wbuf2), :$data);
+}
+
+react {
+  whenever $ring.Supply -> $cqe {
+    done;
+  }
+}
+
+start {
+  sleep 0.05;
   $ring.fsync($handle, 0, :$data);
+}
+
+react {
+  whenever $ring.Supply -> $cqe {
+    done;
+  }
+}
+
+start {
+  sleep 0.05;
   $ring.readv($handle, ($rbuf1, $rbuf2), :$data);
 }
 
