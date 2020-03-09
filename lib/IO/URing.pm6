@@ -23,6 +23,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     UInt :$flags = INIT { 0
       +| ($version ~~ v5.4+ ?? $::('IORING_FEAT_SINGLE_MMAP') !! 0)
       +| ($version ~~ v5.5+ ?? $::('IORING_FEAT_NODROP') +| $::('IORING_FEAT_SUBMIT_STABLE') !! 0)
+      +| ($version ~~ v5.6+ ?? $::('IORING_SETUP_CLAMP') !! 0)
     }
   ) {
     io_uring_queue_init($entries, $!ring, $flags);
