@@ -101,31 +101,28 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     return $tmp;
   }
 
-  method !submit(io_uring_sqe $sqe is rw, :$chain = False) {
-    $sqe.flags +|= INIT {
-      $version ~~ v5.3+ && $chain
-        ?? $::('IOSQE_IO_LINK')
-        !! ($chain ?? fail "Cannot chain with kernel release < 5.3" !! 0)
-    };
+  method !submit(io_uring_sqe $sqe is rw, :$drain = False, :$chain = False) {
+    $sqe.flags +|= INIT { $::('IOSQE_IO_LINK') // 0 } if $chain;
+    $sqe.flags +|= INIT { $::('IOSQE_IO_DRAIN') // 0 } if $chain;
     io_uring_submit($!ring);
   }
 
-  method nop(:$data = 0, :$chain = False) {
+  method nop(:$data = 0, :$drain = False, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
     my Int $user_data = $data.defined ?? self!store($data) !! Int;
     io_uring_prep_nop($sqe, $user_data);
-    self!submit($sqe, :$chain);
+    self!submit($sqe, :$drain, :$chain);
   }
 
-  multi method readv($fd, *@bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
-    self.readv($fd, @bufs, :$offset, :$data, :$chain);
+  multi method readv($fd, *@bufs, Int :$offset = 0, :$data = 0, :$drain = False, :$chain = False) {
+    self.readv($fd, @bufs, :$offset, :$data, :$drain, :$chain);
   }
 
-  multi method readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
-    self!readv($fd, to-read-bufs(@bufs), :$offset, :$data, :$chain);
+  multi method readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$drain = False, :$chain = False) {
+    self!readv($fd, to-read-bufs(@bufs), :$offset, :$data, :$drain, :$chain);
   }
 
-  method !readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
+  method !readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$drain, :$chain) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
     my $num_vr = @bufs.elems;
     my buf8 $iovecs .= new;
@@ -138,18 +135,18 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     }
     my Int $user_data = $data.defined ?? self!store($data) !! Int;
     io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset, $user_data);
-    self!submit($sqe, :$chain);
+    self!submit($sqe, :$drain, :$chain);
   }
 
-  multi method writev($fd, *@bufs, Int :$offset = 0, :$data = 0, :$enc = 'utf-8', :$chain = False) {
-    self.writev($fd, @bufs, :$offset, :$data, :$enc, :$chain);
+  multi method writev($fd, *@bufs, Int :$offset = 0, :$data = 0, :$enc = 'utf-8', :$drain = False, :$chain = False) {
+    self.writev($fd, @bufs, :$offset, :$data, :$enc, :$drain, :$chain);
   }
 
-  multi method writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$enc = 'utf-8', :$chain = False) {
+  multi method writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$enc = 'utf-8', :$drain = False, :$chain = False) {
     self!writev($fd, to-write-bufs(@bufs, :$enc), :$offset, :$data, :$chain);
   }
 
-  method !writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$chain = False) {
+  method !writev($fd, @bufs, Int :$offset, :$data, :$drain, :$chain) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
     my $num_vr = @bufs.elems;
     my buf8 $iovecs .= new;
@@ -162,14 +159,14 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     }
     my Int $user_data = $data.defined ?? self!store($data) !! Int;
     io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset, $user_data);
-    self!submit($sqe, :$chain);
+    self!submit($sqe, :$drain, :$chain);
   }
 
-  method fsync($fd, Int $flags, :$data = 0, :$chain = False) {
+  method fsync($fd, Int $flags, :$data = 0, :$drain = False, :$chain = False) {
     my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
     my Int $user_data = $data.defined ?? self!store($data) !! Int;
     io_uring_prep_fsync($sqe, $fd.native-descriptor, $flags, $user_data);
-    self!submit($sqe, :$chain);
+    self!submit($sqe, :$drain, :$chain);
   }
 }
 
