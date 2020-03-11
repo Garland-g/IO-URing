@@ -64,8 +64,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   my sub to-read-buf($item is rw, :$enc) {
     return $item if $item ~~ Blob;
-    return $item = $item.encode($enc) if $item ~~ Str;
-    $item = $item.Blob // fail "Don't know how to make $item.^name into a Blob";
+    die "Must pass a Blob";
   }
 
   my sub to-read-bufs(@items, :$enc) {
