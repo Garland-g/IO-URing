@@ -14,7 +14,8 @@ for @test-val -> $test {
 
   my io_uring_sqe $sqe = io_uring_get_sqe($ring);
   my Pointer[io_uring_cqe] $cqe_arr .= new;
-  io_uring_prep_nop($sqe, $test);
+  io_uring_prep_nop($sqe);
+  $sqe.user_data = $test;
   io_uring_submit($ring);
 
   io_uring_wait_cqe_timeout($ring, $cqe_arr, kernel_timespec);

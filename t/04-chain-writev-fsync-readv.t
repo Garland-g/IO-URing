@@ -2,6 +2,13 @@ use v6;
 use Test;
 use IO::URing;
 
+plan 2;
+
+unless Version.new($*KERNEL.release) ~~ v5.3+ {
+  skip-rest "Cannot test on Linux 5.2 or lower";
+  exit;
+}
+
 my IO::URing $ring .= new(:2entries, :0flags);
 
 # Random values to prove that no cheating is happening
@@ -17,12 +24,12 @@ $wbuf2 = $val.encode.subbuf(5..^10);
 $rbuf1 = blob8.allocate(5);
 $rbuf2 = blob8.allocate(5);
 start {
-  $ring.writev($handle, ($wbuf1, $wbuf2), :$data, :chain);
-  $ring.fsync($handle, 0, :$data, :chain);
+  $ring.writev($handle, ($wbuf1, $wbuf2), :$data, :link);
+  $ring.fsync($handle, 0, :$data, :link);
   $ring.readv($handle, ($rbuf1, $rbuf2), :$data);
 }
 
-react whenever $ring.Supply -> $cqe {
+react whenever $ring.Supply(IORING_OP_READV) -> $cqe {
   is $cqe.data, $data, "Get val {$cqe.data} back from kernel";
   is $rbuf1.decode ~ $rbuf2.decode, $val, "Get temp data back from file";
   done;
