@@ -188,6 +188,24 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $sqe.user_data = self!store($sqe, $data // Nil);
     self!submit($sqe, :$drain, :$link);
   }
+
+  method poll-add($fd, UInt $poll-mask, :$data!, :$drain, :$link --> Handle) {
+    my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+    io_uring_prep_poll_add($sqe, $fd, $poll-mask);
+    my $user_data = self!store($sqe, $data // Nil);
+    $sqe.user_data = $user_data;
+    self!submit($sqe, :$drain, :$link);
+    return Handle.new(:slot($user_data));
+  }
+
+  method poll-remove(Handle $slot, :$drain, :$link) {
+    my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+    my Int $user_data = $slot!Handle::slot;
+    io_uring_prep_poll_remove($sqe, $user_data);
+    $sqe.user_data = $user_data;
+    self!submit($sqe, :$drain, :$link);
+  }
+
 }
 
 sub EXPORT() {

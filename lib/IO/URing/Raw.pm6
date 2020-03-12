@@ -454,6 +454,23 @@ sub io_uring_prep_fsync(io_uring_sqe $sqe, $fd, UInt $fsync_flags --> Nil) {
   $sqe.union-flags = $fsync_flags +& 0xFFFFFFFF;
 }
 
+# specified by iBCS2
+my constant POLLIN =   0x0001;
+my constant POLLPRI =  0x0002;
+my constant POLLOUT =  0x0004;
+my constant POLLERR =  0x0008;
+my constant POLLHUP =  0x0010;
+my constant POLLNVAL = 0x0020;
+
+sub io_uring_prep_poll_add(io_uring_sqe $sqe, $fd, Int $poll_mask --> Nil) {
+  io_uring_prep_rw(IORING_OP_POLL_ADD, $sqe, $fd, Str, 0, 0);
+  $sqe.union-flags = $poll_mask +& 0xFFFF;
+}
+
+sub io_uring_prep_poll_remove(io_uring_sqe $sqe, Int $user_data --> Nil) {
+  io_uring_prep_rw(IORING_OP_POLL_REMOVE, $sqe, -1, $user_data, 0, 0);
+}
+
 #multi sub io_uring_register_files(io_uring, Pointer[int32] $files, uint32 $num_files) returns int32 is native(LIB) { ... }
 
 #multi sub io_uring_register_files(io_uring $ring, @files where .all.^can("native-descriptor"), uint32 $num_files) returns int32 {
@@ -489,6 +506,12 @@ sub EXPORT($version = $real-version ) {
     'IORING_REGISTER_FILES' => IORING_REGISTER_FILES,
     'IORING_UNREGISTER_FILES' => IORING_UNREGISTER_FILES,
     'IOSQE_FIXED_FILE' => IOSQE_FIXED_FILE,
+    'POLLIN' => POLLIN,
+    'POLLPRI' => POLLPRI,
+    'POLLOUT' => POLLOUT,
+    'POLLERR' => POLLERR,
+    'POLLHUP' => POLLHUP,
+    'POLLNVAL' => POLLNVAL,
   );
   my %types = %(
   );
@@ -509,6 +532,8 @@ sub EXPORT($version = $real-version ) {
     '&io_uring_prep_readv' => &io_uring_prep_readv,
     '&io_uring_prep_writev' => &io_uring_prep_writev,
     '&io_uring_prep_fsync' => &io_uring_prep_fsync,
+    '&io_uring_prep_poll_add' => &io_uring_prep_poll_add,
+    '&io_uring_prep_poll_remove' => &io_uring_prep_poll_remove,
   );
   if $version ~~ v5.2+ {
     %constants<IOSQE_IO_DRAIN> = IOSQE_IO_DRAIN;
