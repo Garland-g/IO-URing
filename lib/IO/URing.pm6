@@ -21,19 +21,23 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     submethod BUILD(:$!slot) {}
   }
 
+  my \tweak-flags = INIT { 0
+    +| ($version ~~ v5.4+ ?? $::('IORING_FEAT_SINGLE_MMAP') !! 0)
+    +| ($version ~~ v5.5+ ?? $::('IORING_FEAT_NODROP') +| $::('IORING_FEAT_SUBMIT_STABLE') !! 0)
+    +| ($version ~~ v5.6+ ?? $::('IORING_SETUP_CLAMP') !! 0)
+  };
+
+  my \link-flag = INIT { $::('IOSQE_IO_LINK') // 0 };
+  my \drain-flag = INIT { $::('IOSQE_IO_DRAIN') // 0 };
+
   has io_uring $!ring .= new;
+  has Lock::Async $!ring-lock .= new;
   has Lock::Async $!storage-lock .= new;
   has @!storage is default(STORAGE::EMPTY);
   has Supplier $!supplier .= new;
   has Supply $!supply;
 
-  submethod TWEAK(UInt :$entries,
-    UInt :$flags = INIT { 0
-      +| ($version ~~ v5.4+ ?? $::('IORING_FEAT_SINGLE_MMAP') !! 0)
-      +| ($version ~~ v5.5+ ?? $::('IORING_FEAT_NODROP') +| $::('IORING_FEAT_SUBMIT_STABLE') !! 0)
-      +| ($version ~~ v5.6+ ?? $::('IORING_SETUP_CLAMP') !! 0)
-    }
-  ) {
+  submethod TWEAK(UInt :$entries, UInt :$flags = tweak-flags ) {
     io_uring_queue_init($entries, $!ring, $flags);
     start {
       loop {
@@ -61,7 +65,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   submethod DESTROY() {
-    io_uring_queue_exit($!ring);
+    $!ring-lock.protect: {io_uring_queue_exit($!ring) };
   }
 
   multi method Supply {
@@ -122,16 +126,18 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   method !submit(io_uring_sqe $sqe is rw, :$drain, :$link) {
-    $sqe.flags +|= INIT { $::('IOSQE_IO_LINK') // 0 } if $link;
-    $sqe.flags +|= INIT { $::('IOSQE_IO_DRAIN') // 0 } if $link;
+    $sqe.flags +|= link-flag if $link;
+    $sqe.flags +|= drain-flag if $drain;
     io_uring_submit($!ring);
   }
 
   method nop(:$data = 0, :$drain, :$link) {
-    my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    io_uring_prep_nop($sqe);
-    $sqe.user_data = self!store($sqe, $data // Nil);
-    self!submit($sqe, :$drain, :$link);
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      io_uring_prep_nop($sqe);
+      $sqe.user_data = self!store($sqe, $data // Nil);
+      self!submit($sqe, :$drain, :$link);
+    }
   }
 
   multi method readv($fd, *@bufs, Int :$offset = 0, :$data = 0, :$drain, :$link) {
@@ -143,19 +149,23 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   method !readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$drain, :$link) {
-    my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    my $num_vr = @bufs.elems;
-    my buf8 $iovecs .= new;
-    my $pos = 0;
-    for ^$num_vr -> $num {
-      #TODO Fix when nativecall gets better.
-      # Hack together array of struct iovec from definition
-      $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
-      $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my $num_vr = @bufs.elems;
+      my buf8 $iovecs .= new;
+      my $pos = 0;
+      for ^$num_vr -> $num {
+        #TODO Fix when nativecall gets better.
+        # Hack together array of struct iovec from definition
+        $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num]));
+        $pos += 8;
+        $iovecs.write-uint64($pos, @bufs[$num].elems);
+        $pos += 8;
+      }
+      io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset);
+      $sqe.user_data = self!store($sqe, $data // Nil);
+      self!submit($sqe, :$drain, :$link);
     }
-    io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset);
-    $sqe.user_data = self!store($sqe, $data // Nil);
-    self!submit($sqe, :$drain, :$link);
   }
 
   multi method writev($fd, *@bufs, Int :$offset = 0, :$data = 0, :$enc = 'utf-8', :$drain, :$link) {
@@ -167,43 +177,52 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   method !writev($fd, @bufs, Int :$offset, :$data, :$drain, :$link) {
-    my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    my $num_vr = @bufs.elems;
-    my buf8 $iovecs .= new;
-    my $pos = 0;
-    for ^$num_vr -> $num {
-      #TODO Fix when nativecall gets better.
-      # Hack together array of struct iovec from definition
-      $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
-      $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my $num_vr = @bufs.elems;
+      my buf8 $iovecs .= new;
+      my $pos = 0;
+      for ^$num_vr -> $num {
+        #TODO Fix when nativecall gets better.
+        # Hack together array of struct iovec from definition
+        $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
+        $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
+      }
+      io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset);
+      $sqe.user_data = self!store($sqe, $data // Nil);
+      self!submit($sqe, :$drain, :$link);
     }
-    io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset);
-    $sqe.user_data = self!store($sqe, $data // Nil);
-    self!submit($sqe, :$drain, :$link);
   }
 
-  method fsync($fd, UInt $flags, :$data = 0, :$drain, :$link) {
-    my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    io_uring_prep_fsync($sqe, $fd.native-descriptor, $flags);
-    $sqe.user_data = self!store($sqe, $data // Nil);
-    self!submit($sqe, :$drain, :$link);
+  method fsync($fd, UInt $flags, :$data, :$drain, :$link) {
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      io_uring_prep_fsync($sqe, $fd.native-descriptor, $flags);
+      $sqe.user_data = self!store($sqe, $data // Nil);
+      self!submit($sqe, :$drain, :$link);
+    }
   }
 
   method poll-add($fd, UInt $poll-mask, :$data!, :$drain, :$link --> Handle) {
-    my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    io_uring_prep_poll_add($sqe, $fd, $poll-mask);
-    my $user_data = self!store($sqe, $data // Nil);
-    $sqe.user_data = $user_data;
-    self!submit($sqe, :$drain, :$link);
+    my $user_data;
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      io_uring_prep_poll_add($sqe, $fd, $poll-mask);
+      $user_data = self!store($sqe, $data // Nil);
+      $sqe.user_data = $user_data;
+      self!submit($sqe, :$drain, :$link);
+    }
     return Handle.new(:slot($user_data));
   }
 
   method poll-remove(Handle $slot, :$drain, :$link) {
-    my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-    my Int $user_data = $slot!Handle::slot;
-    io_uring_prep_poll_remove($sqe, $user_data);
-    $sqe.user_data = $user_data;
-    self!submit($sqe, :$drain, :$link);
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my Int $user_data = $slot!Handle::slot;
+      io_uring_prep_poll_remove($sqe, $user_data);
+      $sqe.user_data = $user_data;
+      self!submit($sqe, :$drain, :$link);
+    }
   }
 
 }

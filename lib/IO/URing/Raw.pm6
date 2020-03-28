@@ -1,7 +1,7 @@
-my $real-version = Version.new($*KERNEL.release);
+my $version = Version.new($*KERNEL.release);
 
 die "Must be loaded on Linux 5.1 or higher"
-  unless $*KERNEL ~~ 'linux' && $real-version ~~ v5.1+;
+  unless $*KERNEL ~~ 'linux' && $version ~~ v5.1+;
 
 use NativeCall;
 #use Universal::errno;
@@ -486,7 +486,7 @@ sub io_uring_cqe_get_data(io_uring_cqe $cqe --> Pointer) { Pointer[void].new(+$c
 
 # Older versions of the kernel can crash when attempting to use features
 # that are from later versions. Control EXPORT to prevent that.
-sub EXPORT($version = $real-version ) {
+sub EXPORT() {
   my %constants = %(
     'IORING_SETUP_IOPOLL' => IORING_SETUP_IOPOLL,
     'IORING_SETUP_SQPOLL' => IORING_SETUP_SQPOLL,
