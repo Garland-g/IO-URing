@@ -42,7 +42,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     start {
       loop {
         my Pointer[io_uring_cqe] $cqe_ptr .= new;
-        io_uring_wait_cqe($!ring, $cqe_ptr);
+        my $completed := io_uring_peek_batch_cqe($!ring, $cqe_ptr, $at-once);
+        unless +$cqe_ptr {
+          Thread.yield;
+          next;
+        }
         my io_uring_cqe $temp := $cqe_ptr.deref;
         my ($request, $data) = self!retrieve($temp.user_data);
         my $flags = $temp.flags;

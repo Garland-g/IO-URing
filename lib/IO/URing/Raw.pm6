@@ -390,7 +390,7 @@ sub io_uring_submit_and_wait(|c) {
   !! $result
 }
 
-#sub io_uring_peek_batch_cqe(io_uring, Pointer[io_uring_cqe] is rw, uint32 $count) returns uint32 is native(LIB) { ... }
+sub io_uring_peek_batch_cqe(io_uring, Pointer[io_uring_cqe] is rw, uint32) returns uint32 is native(LIB) { ... }
 
 #multi sub io_uring_wait_cqes(io_uring, io_uring_cqe is rw, kernel_timespec, sigset_t --> int32) is native(LIB) { ... }
 
@@ -423,6 +423,7 @@ sub io_uring_advance(io_uring $ring, uint32 $nr) {
     my io_uring_cq $cq = $ring.cq;
     repeat {
       my $arr = nativecast(CArray[uint32], $cq.khead);
+      full-barrier();
       $arr[0] = $cq.khead.deref + $nr;
     } while (0);
   }
@@ -579,6 +580,7 @@ sub EXPORT() {
     '&io_uring_get_sqe' => &io_uring_get_sqe,
     '&io_uring_cqe_seen' => &io_uring_cqe_seen,
     '&io_uring_submit' => &io_uring_submit,
+    '&io_uring_peek_batch_cqe' => &io_uring_peek_batch_cqe,
     '&io_uring_wait_cqe_timeout' => &io_uring_wait_cqe_timeout,
     '&io_uring_wait_cqe' => &io_uring_wait_cqe,
     '&io_uring_prep_nop' => &io_uring_prep_nop,
