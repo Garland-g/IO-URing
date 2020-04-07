@@ -339,7 +339,17 @@ my constant IORING_UNREGISTER_PERSONALITY = 10;
 #linux 5.6
 my constant IO_URING_OP_SUPPORTED = 1; # 1U << 0
 
-#sub io_uring_queue_init_params(uint32 $entries, io_uring, io_uring_params) is native(LIB) { ... }
+sub _io_uring_queue_init_params(uint32 $entries, io_uring, io_uring_params) returns int32 is native(LIB) is symbol('io_uring_queue_init_params') { ... }
+
+sub io_uring_queue_init_params(UInt $entries, io_uring $ring, io_uring_params $params) returns int32 {
+  my uint32 $entries-u32 = $entries;
+  my int32 $result = _io_uring_queue_init_params($entries-u32, $ring, $params);;
+  return $result < 0
+  ?? do {
+    fail "ring setup failed";
+  }
+  !! $result;
+}
 
 sub io_uring_queue_init(UInt $entries, io_uring $ring, UInt $flags) returns int32 {
   my uint32 $entries-u32 = $entries;
@@ -491,6 +501,9 @@ sub EXPORT() {
     'IORING_SETUP_IOPOLL' => IORING_SETUP_IOPOLL,
     'IORING_SETUP_SQPOLL' => IORING_SETUP_SQPOLL,
     'IORING_SETUP_SQ_AFF' => IORING_SETUP_SQ_AFF,
+    'IORING_SETUP_CQSIZE' => IORING_SETUP_CQSIZE,
+    'IORING_SETUP_CLAMP' => IORING_SETUP_CLAMP,
+    'IORING_SETUP_ATTACH_WQ' => IORING_SETUP_ATTACH_WQ,
     'IORING_FSYNC_DATASYNC' => IORING_FSYNC_DATASYNC,
     'IORING_SQ_NEED_WAKEUP' => IORING_SQ_NEED_WAKEUP,
     'IORING_OP_NOP' => IORING_OP_NOP,
@@ -522,6 +535,7 @@ sub EXPORT() {
   );
   my %subs = %(
     '&io_uring_queue_init' => &io_uring_queue_init,
+    '&io_uring_queue_init_params' => &io_uring_queue_init_params,
     '&io_uring_queue_exit' => &io_uring_queue_exit,
     '&io_uring_get_sqe' => &io_uring_get_sqe,
     '&io_uring_cqe_seen' => &io_uring_cqe_seen,

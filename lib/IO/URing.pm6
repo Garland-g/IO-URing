@@ -21,24 +21,24 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     submethod BUILD(:$!slot) {}
   }
 
-  my \tweak-flags = INIT { 0
-    +| ($version ~~ v5.4+ ?? $::('IORING_FEAT_SINGLE_MMAP') !! 0)
-    +| ($version ~~ v5.5+ ?? $::('IORING_FEAT_NODROP') +| $::('IORING_FEAT_SUBMIT_STABLE') !! 0)
-    +| ($version ~~ v5.6+ ?? $::('IORING_SETUP_CLAMP') !! 0)
-  };
+  my \tweak-flags = IORING_SETUP_CLAMP;
+#  my \features = IORING_FEAT_SINGLE_MMAP
+#  +| IORING_FEAT_NO_DROP
+#  +| IORING_FEAT_SUBMIT_STABLE;
 
-  my \link-flag = INIT { $::('IOSQE_IO_LINK') // 0 };
-  my \drain-flag = INIT { $::('IOSQE_IO_DRAIN') // 0 };
+  my \link-flag = IOSQE_IO_LINK;
+  my \drain-flag = IOSQE_IO_DRAIN;
 
   has io_uring $!ring .= new;
+  has io_uring_params $!params .= new;
   has Lock::Async $!ring-lock .= new;
   has Lock::Async $!storage-lock .= new;
   has @!storage is default(STORAGE::EMPTY);
-  has Supplier $!supplier .= new;
-  has Supply $!supply;
+  has Supplier::Preserving $!supplier .= new;
 
-  submethod TWEAK(UInt :$entries, UInt :$flags = tweak-flags ) {
-    io_uring_queue_init($entries, $!ring, $flags);
+  submethod TWEAK(UInt :$entries, UInt :$flags = tweak-flags, Int :$at-once = 1) {
+    $!params.flags = $flags;
+    my $result = io_uring_queue_init_params($entries, $!ring, $!params);
     start {
       loop {
         my Pointer[io_uring_cqe] $cqe_ptr .= new;
@@ -48,12 +48,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
         my $flags = $temp.flags;
         my $result = $temp.res;
         io_uring_cqe_seen($!ring, $cqe_ptr.deref);
-        my $cmp = Completion.new(
-          :$data,
-          :$request,
-          :$result,
-          :$flags,
-        );
+        my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
         $!supplier.emit($cmp);
       }
       CATCH {
@@ -69,13 +64,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   multi method Supply {
-    $!supply //= do {
-      supply {
-        whenever $!supplier -> $cqe {
-          emit $cqe;
-        }
-      }
-    };
+    $!supplier.Supply;
   }
 
   # Filter by IORING_OP_XXXX
@@ -251,7 +240,6 @@ use IO::URing;
 
 my IO::URing $ring .= new(:8entries, :0flags);
 start {
-  sleep 0.1
   $ring.nop(1);
 }
 react {
