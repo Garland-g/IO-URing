@@ -60,7 +60,20 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   submethod DESTROY() {
-    $!ring-lock.protect: {io_uring_queue_exit($!ring) };
+    if $!ring ~~ io_uring:D {
+      $!ring-lock.protect: { io_uring_queue_exit($!ring) };
+    }
+  }
+
+  method close() {
+    if $!ring ~~ io_uring:D {
+      $!ring-lock.protect: { io_uring_queue_exit($!ring) };
+      $!ring = io_uring;
+    }
+  }
+
+  method features() {
+    do for IORING_FEAT.enums { .key if $!params.features +& .value }
   }
 
   multi method Supply {

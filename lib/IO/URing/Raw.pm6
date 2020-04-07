@@ -298,7 +298,7 @@ class io_uring_params is repr('CStruct') {
   has uint32 $.flags;
   has uint32 $.sq_thread_cpu;
   has uint32 $.sq_thread_idle;
-  has uint32 $.features;
+  has uint32 $.features is rw;
   has uint32 $.wq_fd;
   has uint32 $.resv0;
   has uint32 $.resv1;
@@ -308,16 +308,14 @@ class io_uring_params is repr('CStruct') {
 }
 
 # io_uring_params features flags
-# linux 5.4
-my constant IORING_FEAT_SINGLE_MMAP = 1;      # 1U << 0
-# linux 5.5
-my constant IORING_FEAT_NODROP = 2;           # 1U << 1
-my constant IORING_FEAT_SUBMIT_STABLE = 4;    # 1U << 2
-# linux 5.6
-my constant IORING_FEAT_RW_CUR_POS = 8;       # 1U << 3
-my constant IORING_FEAT_CUR_PERSONALITY = 16; # 1U << 4
-#TODO # linux 5.7?
-#constant IORING_FEAT_FAST_POLL = 32;       # 1U << 5
+enum IORING_FEAT (
+  SINGLE_MMAP => 1,      #5.4  1U << 0
+  NODROP => 2,           #5.5  1U << 1
+  SUBMIT_STABLE => 4,    #5.5  1U << 2
+  RW_CUR_POS => 8,       #5.6  1U << 3
+  CUR_PERSONALITY => 16, #5.6  1U << 4
+  FAST_POLL => 32,       #5.7  1U << 5
+);
 
 # io_uring_register opcodes and arguments
 # linux 5.1
@@ -514,11 +512,52 @@ sub EXPORT() {
     'IORING_OP_WRITE_FIXED' => IORING_OP_WRITE_FIXED,
     'IORING_OP_POLL_ADD' => IORING_OP_POLL_ADD,
     'IORING_OP_POLL_REMOVE' => IORING_OP_POLL_REMOVE,
+    'IORING_OP_TIMEOUT' => IORING_OP_TIMEOUT,
+    'IORING_OP_SYNC_FILE_RANGE' => IORING_OP_SYNC_FILE_RANGE,
+    'IORING_OP_SENDMSG' => IORING_OP_SENDMSG,
+    'IORING_OP_RECVMSG' => IORING_OP_RECVMSG,
+    'IORING_OP_TIMEOUT_REMOVE' => IORING_OP_TIMEOUT_REMOVE,
+    'IORING_OP_ACCEPT' => IORING_OP_ACCEPT,
+    'IORING_OP_ASYNC_CANCEL' => IORING_OP_ASYNC_CANCEL,
+    'IORING_OP_LINK_TIMEOUT' => IORING_OP_LINK_TIMEOUT,
+    'IORING_OP_CONNECT' => IORING_OP_CONNECT,
+    'IORING_OP_FALLOCATE' => IORING_OP_FALLOCATE,
+    'IORING_OP_OPENAT' => IORING_OP_OPENAT,
+    'IORING_OP_CLOSE' => IORING_OP_CLOSE,
+    'IORING_OP_FILES_UPDATE' => IORING_OP_FILES_UPDATE,
+    'IORING_OP_STATX' => IORING_OP_STATX,
+    'IORING_OP_READ' => IORING_OP_READ,
+    'IORING_OP_WRITE' => IORING_OP_WRITE,
+    'IORING_OP_FADVISE' => IORING_OP_FADVISE,
+    'IORING_OP_MADVISE' => IORING_OP_MADVISE,
+    'IORING_OP_SEND' => IORING_OP_SEND,
+    'IORING_OP_RECV' => IORING_OP_RECV,
+    'IORING_OP_OPENAT2' => IORING_OP_OPENAT2,
+    'IORING_OP_EPOLL_CTL' => IORING_OP_EPOLL_CTL,
+    'IOSQE_IO_DRAIN' => IOSQE_IO_DRAIN,
+    'IOSQE_IO_LINK' => IOSQE_IO_LINK,
+    'IOSQE_IO_HARDLINK' => IOSQE_IO_HARDLINK,
+    'IOSQE_ASYNC' => IOSQE_ASYNC,
+    'IORING_FEAT' => IORING_FEAT,
+    'IORING_FEAT_SINGLE_MMAP' => IORING_FEAT::SINGLE_MMAP,
+    'IORING_FEAT_NODROP' => IORING_FEAT::NODROP,
+    'IORING_FEAT_SUBMIT_STABLE' => IORING_FEAT::SUBMIT_STABLE,
     'IORING_REGISTER_BUFFERS' => IORING_REGISTER_BUFFERS,
     'IORING_UNREGISTER_BUFFERS' => IORING_UNREGISTER_BUFFERS,
     'IORING_REGISTER_FILES' => IORING_REGISTER_FILES,
     'IORING_UNREGISTER_FILES' => IORING_UNREGISTER_FILES,
+    'IORING_REGISTER_FILES_UPDATE' => IORING_REGISTER_FILES_UPDATE,
+    'IORING_REGISTER_EVENTFD_ASYNC' => IORING_REGISTER_EVENTFD_ASYNC,
+    'IORING_REGISTER_EVENTFD' => IORING_REGISTER_EVENTFD,
+    'IORING_UNREGISTER_EVENTFD' => IORING_UNREGISTER_EVENTFD,
+    'IORING_TIMEOUT_ABS' => IORING_TIMEOUT_ABS,
     'IOSQE_FIXED_FILE' => IOSQE_FIXED_FILE,
+    'IOSQE_ASYNC' => IOSQE_ASYNC,
+    'IOSQE_FIXED_FILE_BIT' => IOSQE_FIXED_FILE_BIT,
+    'IOSQE_IO_DRAIN_BIT' => IOSQE_IO_DRAIN_BIT,
+    'IOSQE_IO_LINK_BIT' => IOSQE_IO_LINK_BIT,
+    'IOSQE_IO_HARDLINK_BIT' => IOSQE_IO_HARDLINK_BIT,
+    'IOSQE_ASYNC_BIT' => IOSQE_ASYNC_BIT,
     'POLLIN' => POLLIN,
     'POLLPRI' => POLLPRI,
     'POLLOUT' => POLLOUT,
@@ -548,60 +587,12 @@ sub EXPORT() {
     '&io_uring_prep_fsync' => &io_uring_prep_fsync,
     '&io_uring_prep_poll_add' => &io_uring_prep_poll_add,
     '&io_uring_prep_poll_remove' => &io_uring_prep_poll_remove,
+    '&io_uring_prep_accept' => &io_uring_prep_accept,
+    '&io_uring_prep_connect' => &io_uring_prep_connect,
+    '&io_uring_prep_send' => &io_uring_prep_send,
+    '&io_uring_prep_recv' => &io_uring_prep_recv,
   );
-  if $version ~~ v5.2+ {
-    %constants<IOSQE_IO_DRAIN> = IOSQE_IO_DRAIN;
-    %constants<IORING_OP_SYNC_FILE_RANGE> = IORING_OP_SYNC_FILE_RANGE;
-    %constants<IORING_REGISTER_EVENTFD> = IORING_REGISTER_EVENTFD;
-    %constants<IORING_UNREGISTER_EVENTFD> = IORING_UNREGISTER_EVENTFD;
-  }
-  if $version ~~ v5.3+ {
-    %constants<IOSQE_IO_LINK> = IOSQE_IO_LINK;
-    %constants<IORING_OP_SENDMSG> = IORING_OP_SENDMSG;
-    %constants<IORING_OP_RECVMSG> = IORING_OP_RECVMSG;
-  }
-  if $version ~~ v5.4+ {
-    %constants<IORING_OP_TIMEOUT> = IORING_OP_TIMEOUT;
-    %constants<IORING_FEAT_SINGLE_MMAP> = IORING_FEAT_SINGLE_MMAP;
-  }
-  if $version ~~ v5.5+ {
-    %constants<IORING_FEAT_NODROP> = IORING_FEAT_NODROP;
-    %constants<IORING_FEAT_SUBMIT_STABLE> = IORING_FEAT_SUBMIT_STABLE;
-    %constants<IORING_SETUP_CQSIZE> = IORING_SETUP_CQSIZE;
-    %constants<IORING_TIMEOUT_ABS> = IORING_TIMEOUT_ABS;
-    %constants<IOSQE_IO_HARDLINK> = IOSQE_IO_HARDLINK;
-    %constants<IORING_OP_TIMEOUT_REMOVE> = IORING_OP_TIMEOUT_REMOVE;
-    %constants<IORING_OP_ACCEPT> = IORING_OP_ACCEPT;
-    %constants<IORING_OP_ASYNC_CANCEL> = IORING_OP_ASYNC_CANCEL;
-    %constants<IORING_OP_LINK_TIMEOUT> = IORING_OP_LINK_TIMEOUT;
-    %constants<IORING_OP_CONNECT> = IORING_OP_CONNECT;
-    %constants<IORING_REGISTER_FILES_UPDATE> = IORING_REGISTER_FILES_UPDATE;
-    %constants<IORING_REGISTER_EVENTFD_ASYNC> = IORING_REGISTER_EVENTFD_ASYNC;
-  }
-  if $version ~~ v5.6+ {
-    %constants<IORING_SETUP_CLAMP> = IORING_SETUP_CLAMP;
-    %constants<IORING_SETUP_ATTACH_WQ> = IORING_SETUP_ATTACH_WQ;
-    %constants<IOSQE_ASYNC> = IOSQE_ASYNC;
-    %constants<IOSQE_FIXED_FILE_BIT> = IOSQE_FIXED_FILE_BIT;
-    %constants<IOSQE_IO_DRAIN_BIT> = IOSQE_IO_DRAIN_BIT;
-    %constants<IOSQE_IO_LINK_BIT> = IOSQE_IO_LINK_BIT;
-    %constants<IOSQE_IO_HARDLINK_BIT> = IOSQE_IO_HARDLINK_BIT;
-    %constants<IOSQE_ASYNC_BIT> = IOSQE_ASYNC_BIT;
-    %constants<IORING_OP_FALLOCATE> = IORING_OP_FALLOCATE;
-    %constants<IORING_OP_OPENAT> = IORING_OP_OPENAT;
-    %constants<IORING_OP_CLOSE> = IORING_OP_CLOSE;
-    %constants<IORING_OP_FILES_UPDATE> = IORING_OP_FILES_UPDATE;
-    %constants<IORING_OP_STATX> = IORING_OP_STATX;
-    %constants<IORING_OP_READ> = IORING_OP_READ;
-    %constants<IORING_OP_WRITE> = IORING_OP_WRITE;
-    %constants<IORING_OP_FADVISE> = IORING_OP_FADVISE;
-    %constants<IORING_OP_MADVISE> = IORING_OP_MADVISE;
-    %constants<IORING_OP_SEND> = IORING_OP_SEND;
-    %constants<IORING_OP_RECV> = IORING_OP_RECV;
-    %constants<IORING_OP_OPENAT2> = IORING_OP_OPENAT2;
-    %constants<IORING_OP_EPOLL_CTL> = IORING_OP_EPOLL_CTL;
-  }
   my %base = %(|%constants, |%types, |%subs, |%export-types);
-  %base<%IO_URING_RAW_EXPORT> = %(|%constants, |%types);
+  %base<%IO_URING_RAW_EXPORT> = %(|%constants, |%export-types);
   %base;
 }
