@@ -24,10 +24,6 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   my \tweak-flags = IORING_SETUP_CLAMP;
-#  my \features = IORING_FEAT_SINGLE_MMAP
-#  +| IORING_FEAT_NO_DROP
-#  +| IORING_FEAT_SUBMIT_STABLE;
-
   my \link-flag = IOSQE_IO_LINK;
   my \drain-flag = IOSQE_IO_DRAIN;
 
@@ -38,8 +34,15 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   has @!storage is default(STORAGE::EMPTY);
   has Supplier::Preserving $!supplier .= new;
 
-  submethod TWEAK(UInt :$entries, UInt :$flags = tweak-flags, Int :$at-once = 1) {
+  submethod TWEAK(UInt :$entries!, UInt :$flags = tweak-flags, Int :$cq-size, Int :$at-once = 1) {
     $!params.flags = $flags;
+    if $cq-size.defined && $cq-size >= $entries {
+      given log2($cq-size) {
+        $cq-size = 2^($_ + 1) unless $_ ~~ Int;
+      }
+      $!params.flags +|= IORING_SETUP_CQSIZE;
+      $!params.cq_entries = $cq-size;
+    }
     my $result = io_uring_queue_init_params($entries, $!ring, $!params);
     start {
       loop {
