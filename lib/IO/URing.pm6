@@ -2,8 +2,6 @@ use v6;
 use IO::URing::Raw;
 use NativeCall;
 
-my $version = Version.new($*KERNEL.release);
-
 class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   my enum STORAGE <EMPTY>;
 
