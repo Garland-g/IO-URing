@@ -15,10 +15,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   my class Handle is Promise {
     trusts IO::URing;
     has Int $!slot;
-    has $!ring;
-    has $.op;
     method !slot(--> Int) is rw { $!slot }
-    submethod BUILD(:$!op, :$!ring) {}
   }
 
   my \tweak-flags = IORING_SETUP_CLAMP;
