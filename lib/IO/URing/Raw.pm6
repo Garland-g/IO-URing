@@ -294,11 +294,11 @@ class io_cqring_offsets is repr('CStruct') {
 
 class io_uring_params is repr('CStruct') {
   has uint32 $.sq_entries;
-  has uint32 $.cq_entries;
-  has uint32 $.flags;
+  has uint32 $.cq_entries is rw;
+  has uint32 $.flags is rw;
   has uint32 $.sq_thread_cpu;
   has uint32 $.sq_thread_idle;
-  has uint32 $.features is rw;
+  has uint32 $.features;
   has uint32 $.wq_fd;
   has uint32 $.resv0;
   has uint32 $.resv1;
@@ -480,6 +480,11 @@ sub io_uring_prep_poll_remove(io_uring_sqe $sqe, Int $user_data --> Nil) {
   io_uring_prep_rw(IORING_OP_POLL_REMOVE, $sqe, -1, $user_data, 0, 0);
 }
 
+sub io_uring_prep_cancel(io_uring_sqe $sqe, UInt $flags, Int $user_data --> Nil) {
+  io_uring_prep_rw(IORING_OP_ASYNC_CANCEL, $sqe, -1, $user_data, 0, 0);
+  $sqe.union-flags = $flags;
+}
+
 #multi sub io_uring_register_files(io_uring, Pointer[int32] $files, uint32 $num_files) returns int32 is native(LIB) { ... }
 
 #multi sub io_uring_register_files(io_uring $ring, @files where .all.^can("native-descriptor"), uint32 $num_files) returns int32 {
@@ -589,6 +594,7 @@ sub EXPORT() {
     '&io_uring_prep_fsync' => &io_uring_prep_fsync,
     '&io_uring_prep_poll_add' => &io_uring_prep_poll_add,
     '&io_uring_prep_poll_remove' => &io_uring_prep_poll_remove,
+    '&io_uring_prep_cancel' => &io_uring_prep_cancel,
     '&io_uring_prep_accept' => &io_uring_prep_accept,
     '&io_uring_prep_connect' => &io_uring_prep_connect,
     '&io_uring_prep_send' => &io_uring_prep_send,
