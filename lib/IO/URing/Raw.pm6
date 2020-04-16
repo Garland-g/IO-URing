@@ -613,10 +613,6 @@ sub EXPORT() {
     '&io_uring_prep_poll_add' => &io_uring_prep_poll_add,
     '&io_uring_prep_poll_remove' => &io_uring_prep_poll_remove,
     '&io_uring_prep_cancel' => &io_uring_prep_cancel,
-    '&io_uring_prep_accept' => &io_uring_prep_accept,
-    '&io_uring_prep_connect' => &io_uring_prep_connect,
-    '&io_uring_prep_send' => &io_uring_prep_send,
-    '&io_uring_prep_recv' => &io_uring_prep_recv,
   );
   my %base = %(|%constants, |%types, |%subs, |%export-types);
   %base<%IO_URING_RAW_EXPORT> = %(|%constants, |%export-types);
