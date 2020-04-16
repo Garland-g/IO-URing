@@ -19,42 +19,20 @@ $rbuf2 = blob8.allocate(5);
 
 # Emulates chain for kernel versions that don't have it.
 
-start {
-  sleep 0.05;
-  $ring.writev($handle, ($wbuf1, $wbuf2), :$data);
-}
-
 react {
-  whenever $ring.Supply -> $cqe {
-    done;
+  whenever $ring.writev($handle, ($wbuf1, $wbuf2), :$data) -> $cqe {
   }
-}
 
-start {
-  sleep 0.05;
-  $ring.fsync($handle, 0, :$data);
-}
-
-react {
-  whenever $ring.Supply -> $cqe {
-    done;
+  whenever $ring.fsync($handle, 0, :$data) -> $cqe {
   }
-}
 
-start {
-  sleep 0.05;
-  $ring.readv($handle, ($rbuf1, $rbuf2), :$data);
-}
-
-react {
-  whenever $ring.Supply -> $cqe {
+  whenever $ring.readv($handle, ($rbuf1, $rbuf2), :$data) -> $cqe {
     is $cqe.data, $data, "Get val {$cqe.data} back from kernel";
     is $rbuf1.decode ~ $rbuf2.decode, $val, "Get temp data back from file";
     done;
   }
 }
-
-$handle.close;
-unlink($*TMPDIR.add($val).IO);
-done-testing;
+  $handle.close;
+  unlink($*TMPDIR.add($val).IO);
+  done-testing;
 

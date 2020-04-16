@@ -91,12 +91,14 @@ my constant IORING_OP_EPOLL_CTL = 29;
 my constant IORING_ENTER_GETEVENTS = 1;
 my constant IORING_ENTER_SQ_WAKEUP = 2;
 
-sub free(Pointer) is native { ... }
+sub free(Pointer) is native is export { ... }
 
-#TODO This class is here for type-safety purposes, but does not function
-# properly. Currently is only being used as a nativecast type target.
+sub memcpy(Pointer[void], Pointer[void], size_t) returns Pointer[void] is native is export {...}
+
+sub malloc(size_t $size) returns Pointer[void] is native { ... }
+
 class iovec is repr('CStruct') is rw {
-  has Pointer $.iov_base;
+  has Pointer[void] $.iov_base;
   has size_t $.iov_len;
 
   submethod BUILD(Pointer:D :$iov_base, Int:D :$iov_len) {
@@ -104,25 +106,40 @@ class iovec is repr('CStruct') is rw {
     $!iov_len = $iov_len;
   }
 
-  multi method new(Buf $buf --> iovec) {
-    self.bless(iov_base => nativecast(Pointer, $buf), iov_len => $buf.bytes);
+  method free(iovec:D:) {
+    free(nativecast(Pointer[void], self));
   }
 
-  multi method new(Pointer:D :$iov_base, Int:D :$iov_len) {
-    self.bless(:$iov_base, :$iov_len);
+  multi method new(Str $str --> iovec) {
+    self.new($str.encode);
   }
 
-  method Buf {
-    my buf8 $buf .= new;
-    my $arr = nativecast(Pointer[CArray[int8]], self);
-    for ^$!iov_len {
-      $buf.write-int8($_, $arr[$_]);
-    }
+  multi method new(Blob $blob --> iovec) {
+    my $ptr = malloc($blob.bytes);
+    memcpy($ptr, nativecast(Pointer[void], $blob), $blob.bytes);
+    self.bless(:iov_base($ptr), :iov_len($blob.bytes));
+  }
+
+  multi method new(CArray[size_t] $arr, UInt $pos) {
+    self.bless(:iov_base($arr[$pos]), :iov_len($arr[$pos + 1]));
+  }
+
+  multi method new(size_t :$ptr, size_t :$len) {
+    self.bless(:iov_base($ptr), :iov_len($len))
+  }
+
+  method Blob {
+    my buf8 $buf .= allocate($!iov_len);
+    memcpy(nativecast(Pointer[void], $buf), $!iov_base, $!iov_len);
     $buf;
   }
 
-  method Numeric {
-    return +nativecast(Pointer, self);
+  method elems {
+    $!iov_len
+  }
+
+  method Pointer {
+    $!iov_base;
   }
 }
 
@@ -450,11 +467,11 @@ sub io_uring_prep_nop(io_uring_sqe $sqe --> Nil) {
   io_uring_prep_rw(IORING_OP_NOP, $sqe, -1, Pointer, 0, 0);
 }
 
-sub io_uring_prep_readv(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
+sub io_uring_prep_readv(io_uring_sqe $sqe, $fd, Pointer[size_t] $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
   io_uring_prep_rw(IORING_OP_READV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
 }
 
-sub io_uring_prep_writev(io_uring_sqe $sqe, $fd, iovec $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
+sub io_uring_prep_writev(io_uring_sqe $sqe, $fd, Pointer[size_t] $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
   io_uring_prep_rw(IORING_OP_WRITEV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
 }
 
@@ -572,6 +589,7 @@ sub EXPORT() {
     'POLLNVAL' => POLLNVAL,
   );
   my %types = %(
+    'iovec' => iovec,
   );
   my %export-types = %(
     'io_uring' => io_uring,

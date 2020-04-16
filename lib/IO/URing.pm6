@@ -7,7 +7,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   my class Completion {
     has $.data;
-    has $.request;
+    has io_uring_sqe $.request;
     has Int $.result;
     has Int $.flags;
   }
@@ -27,7 +27,6 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   has Lock::Async $!ring-lock .= new;
   has Lock::Async $!storage-lock .= new;
   has @!storage is default(STORAGE::EMPTY);
-  has Supplier::Preserving $!supplier .= new;
 
   submethod TWEAK(UInt :$entries!, UInt :$flags = tweak-flags, Int :$cq-size, Int :$at-once = 1) {
     $!params.flags = $flags;
@@ -54,7 +53,6 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
         io_uring_cqe_seen($!ring, $cqe_ptr.deref);
         my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
         $vow.keep($cmp);
-        $!supplier.emit($cmp);
       }
       CATCH {
         default {
@@ -79,19 +77,6 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   method features() {
     do for IORING_FEAT.enums { .key if $!params.features +& .value }
-  }
-
-  multi method Supply {
-    $!supplier.Supply;
-  }
-
-  # Filter by IORING_OP_XXXX
-  multi method Supply(@ops) {
-    self.Supply.grep({$_.request.opcode (elem) @ops});
-  }
-
-  multi method Supply(*@ops) {
-    self.Supply.grep({$_.request.opcode (elem) @ops});
   }
 
   my sub to-read-buf($item is rw, :$enc) {
@@ -159,21 +144,28 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   method !readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$drain, :$link --> Handle) {
     my $num_vr = @bufs.elems;
-    my buf8 $iovecs .= new;
+    my CArray[size_t] $iovecs .= new;
     my $pos = 0;
-    for ^$num_vr -> $num {
-      #TODO Fix when nativecall gets better.
-      # Hack together array of struct iovec from definition
-      $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num]));
-      $pos += 8;
-      $iovecs.write-uint64($pos, @bufs[$num].elems);
-      $pos += 8;
+    my @iovecs;
+    for @bufs -> $buf {
+      my iovec $iov .= new($buf);
+      $iovecs[$pos] = +$iov.Pointer;
+      $iovecs[$pos + 1] = $iov.elems;
+      @iovecs.push($iov);
+      $pos += 2;
     }
-    my Handle $p .= new;
+    my Handle $promise .= new;
+    my Handle $p = $promise.then(-> $val {
+      for ^@bufs.elems -> $i {
+        @bufs[$i] = @iovecs[$i].Blob;
+        @iovecs[$i].free;
+      }
+      $val.result;
+    });
     $!ring-lock.protect: {
       my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-      io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset);
-      $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
+      io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(Pointer[size_t], $iovecs), $num_vr, $offset);
+      $sqe.user_data = self!store($promise.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
       self!submit($sqe, :$drain, :$link);
     }
@@ -190,19 +182,27 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   method !writev($fd, @bufs, Int :$offset, :$data, :$drain, :$link --> Handle) {
     my $num_vr = @bufs.elems;
-    my buf8 $iovecs .= new;
+    my CArray[size_t] $iovecs .= new;
+    my @iovecs;
     my $pos = 0;
-    for ^$num_vr -> $num {
-      #TODO Fix when nativecall gets better.
-      # Hack together array of struct iovec from definition
-      $iovecs.write-uint64($pos, +nativecast(Pointer, @bufs[$num])); $pos += 8;
-      $iovecs.write-uint64($pos, @bufs[$num].elems); $pos += 8;
+    for @bufs -> $buf {
+      my iovec $iov .= new($buf);
+      $iovecs[$pos] = +$iov.Pointer;
+      $iovecs[$pos + 1] = $iov.elems;
+      @iovecs.push($iov);
+      $pos += 2;
     }
-    my Handle $p .= new;
+    my Handle $promise .= new;
+    my Handle $p = $promise.then( -> $val {
+      for @iovecs -> $iov {
+        $iov.free;
+      }
+      $val.result;
+    });
     $!ring-lock.protect: {
       my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-      io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(iovec, $iovecs), $num_vr, $offset);
-      $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
+      io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(Pointer[size_t], $iovecs), $num_vr, $offset);
+      $sqe.user_data = self!store($promise.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
       self!submit($sqe, :$drain, :$link);
     }

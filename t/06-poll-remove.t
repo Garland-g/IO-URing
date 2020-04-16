@@ -16,15 +16,14 @@ $wbuf2 = $val.encode.subbuf(5..^10);
 
 $rbuf1 = blob8.allocate(5);
 $rbuf2 = blob8.allocate(5);
-start {
+react {
   my $handle = $ring.poll-add($file.native-descriptor, POLLOUT, :$data);
-  $ring.poll-remove($handle);
+  whenever $ring.poll-remove($handle, :$data) -> $cqe {
+    is $cqe.data, $data, "Get val {$cqe.data} back from kernel";
+    done;
+  }
 }
 
-react whenever $ring.Supply -> $cqe {
-  is $cqe.data, $data, "Get val {$cqe.data} back from kernel";
-  done;
-}
 $file.close;
 unlink($*TMPDIR.add($val).IO);
 done-testing;

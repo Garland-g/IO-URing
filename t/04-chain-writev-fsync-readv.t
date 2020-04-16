@@ -23,13 +23,9 @@ $wbuf2 = $val.encode.subbuf(5..^10);
 
 $rbuf1 = blob8.allocate(5);
 $rbuf2 = blob8.allocate(5);
-start {
-  $ring.writev($handle, ($wbuf1, $wbuf2), :$data, :link);
-  $ring.fsync($handle, 0, :$data, :link);
-  $ring.readv($handle, ($rbuf1, $rbuf2), :$data);
-}
-
-react whenever $ring.Supply(IORING_OP_READV) -> $cqe {
+$ring.writev($handle, ($wbuf1, $wbuf2), :$data, :link);
+$ring.fsync($handle, 0, :$data, :link);
+react whenever $ring.readv($handle, ($rbuf1, $rbuf2), :$data) -> $cqe {
   is $cqe.data, $data, "Get val {$cqe.data} back from kernel";
   is $rbuf1.decode ~ $rbuf2.decode, $val, "Get temp data back from file";
   done;
