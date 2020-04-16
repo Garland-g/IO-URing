@@ -286,17 +286,13 @@ Sample NOP call
 use IO::URing;
 
 my IO::URing $ring .= new(:8entries, :0flags);
-start {
-  $ring.nop(1);
-}
-react {
-  whenever signal(SIGINT) {
-    say "done"; exit;
-  }
-  whenever $ring.Supply -> $data {
+my $data = await $ring.nop(1);
+# or
+react whenever $ring.nop(1) -> $data {
     say "data: {$data.raku}";
   }
 }
+$ring.close; # free the ring
 
 =end code
 
