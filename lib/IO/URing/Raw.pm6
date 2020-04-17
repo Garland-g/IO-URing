@@ -387,7 +387,7 @@ sub io_uring_queue_exit(io_uring) is native(LIB) { ... }
 
 sub io_uring_submit(|c) returns int32 {
   my int32 $result = _io_uring_submit(|c);
-  return $result != 1
+  return $result < 0
   ?? do {
     fail "sqe submit failed: $result";
   }
