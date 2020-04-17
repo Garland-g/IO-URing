@@ -19,8 +19,6 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   my \tweak-flags = IORING_SETUP_CLAMP;
-  my \link-flag = IOSQE_IO_LINK;
-  my \drain-flag = IOSQE_IO_DRAIN;
 
   has io_uring $!ring .= new;
   has io_uring_params $!params .= new;
@@ -117,8 +115,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   method !submit(io_uring_sqe $sqe is rw, :$drain, :$link) {
-    $sqe.flags +|= link-flag if $link;
-    $sqe.flags +|= drain-flag if $drain;
+    $sqe.flags +|= IOSQE_IO_LINK if $link;
+    $sqe.flags +|= IOSQE_IO_DRAIN if $drain;
     io_uring_submit($!ring);
   }
 
