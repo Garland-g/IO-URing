@@ -137,7 +137,56 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     io_uring_submit($!ring);
   }
 
-  method nop(:$data, :$drain, :$link --> Handle) {
+  multi method submit(*@submissions --> Array[Handle]) {
+    self.submit(@submissions);
+  }
+
+  multi method submit(@submissions --> Array[Handle]) {
+    my Handle @handles;
+    $!ring-lock.protect: {
+      @handles = do for @submissions -> Submission $sub {
+        my Handle $p .= new;
+        my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+        $p.break(Failure.new("No more room in ring")) unless $sqe.defined;
+        $sqe.opcode = $sub.opcode;
+        $sqe.flags = $sub.flags;
+        $sqe.ioprio = $sub.ioprio;
+        $sqe.fd = $sub.fd;
+        $sqe.off = $sub.off;
+        $sqe.addr = $sub.addr;
+        $sqe.len = $sub.len;
+        $sqe.union-flags = $sub.union-flags;
+        $sqe.user_data = self!store($p.vow, $sqe, $sub.data // Nil);
+        $sqe.pad0 = $sqe.pad1 = $sqe.pad2 = 0;
+        $sub.then.defined ?? $p.then($sub.then) !! $p;
+      }
+      io_uring_submit($!ring);
+    }
+    @handles
+  }
+
+  sub set-flags(:$drain, :$link, :$hard-link, :$force-async --> int) {
+    my int $flags = 0;
+    $flags +|= IOSQE_IO_LINK if $link;
+    $flags +|= IOSQE_IO_DRAIN if $drain;
+    $flags +|= IOSQE_IO_HARDLINK if $hard-link;
+    $flags;
+  }
+
+  method prep-nop(:$data, :$ioprio = 0, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
+    return Submission.new(
+                         :opcode(IORING_OP_NOP),
+                         :$flags,
+                         :$ioprio,
+                         :fd(-1),
+                         :off(0),
+                         :addr(0),
+                         :len(0),
+                         :$data);
+  }
+
+  method nop(:$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
       my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
