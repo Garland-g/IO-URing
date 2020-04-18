@@ -449,6 +449,58 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $p
   }
 
+  method accept($fd, $sockaddr?, Int :$flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    my Handle $p .= new;
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      io_uring_prep_accept($sqe, $fd, $flags, $sockaddr);
+      $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
+      $p!Handle::slot = $sqe.user_data;
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
+    }
+    $p;
+  }
+
+  method connect($fd, $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    my Handle $p .= new;
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      io_uring_prep_connect($sqe, $fd, $sockaddr);
+      $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
+      $p!Handle::slot = $sqe.user_data;
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
+    }
+    $p;
+  }
+
+  multi method send($fd, Str $str, Int :$flags = 0, :$enc = 'utf-8', :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    self.send($fd, $str.encode($enc), :$flags, :$drain, :$link, :$hard-link, :$force-async);
+  }
+
+  multi method send($fd, Blob $buf, Int :$flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    my Handle $p .= new;
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      io_uring_prep_send($sqe, $fd, nativecast(Pointer[void], $buf), $buf.bytes, $flags);
+      $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
+      $p!Handle::slot = $sqe.user_data;
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
+    }
+    $p;
+  }
+
+  multi method recv($fd, Blob $buf, Int :$flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    my Handle $p .= new;
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      io_uring_prep_recv($sqe, $fd, nativecast(Pointer[void], $buf), $buf.bytes, $flags);
+      $sqe.user_data = self!store($p, $sqe, $data // Nil);
+      $p!Handle::slot = $sqe.user_data;
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
+    }
+    $p;
+  }
+
 }
 
 sub EXPORT() {

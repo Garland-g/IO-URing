@@ -4,6 +4,7 @@ die "Must be loaded on Linux 5.1 or higher"
   unless $*KERNEL ~~ 'linux' && $version ~~ v5.1+;
 
 use NativeCall;
+use Unix::Socket::Raw :ALL;
 #use Universal::errno;
 
 my constant LIB = "uring";
@@ -507,6 +508,27 @@ sub io_uring_prep_cancel(io_uring_sqe $sqe, UInt $flags, Int $user_data --> Nil)
   $sqe.union-flags = $flags;
 }
 
+sub io_uring_prep_accept(io_uring_sqe $sqe, $fd, $flags, $addr --> Nil) {
+  my $size = $addr.defined ?? $addr.size !! 0;
+  my $address = $addr.defined ?? nativecast(Pointer, $addr) !! Str;
+  io_uring_prep_rw(IORING_OP_ACCEPT, $sqe, $fd, $address, 0, $size);
+  $sqe.union-flags = $flags;
+}
+
+sub io_uring_prep_connect(io_uring_sqe $sqe, $fd, sockaddr() $addr --> Nil) {
+  io_uring_prep_rw(IORING_OP_CONNECT, $sqe, $fd, nativecast(Pointer, $addr), 0, $addr.size);
+}
+
+sub io_uring_prep_send(io_uring_sqe $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) {
+  io_uring_prep_rw(IORING_OP_SEND, $sqe, $fd, $buf, $len, 0);
+  $sqe.union-flags = $flags;
+}
+
+sub io_uring_prep_recv(io_uring_sqe $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) {
+  io_uring_prep_rw(IORING_OP_RECV, $sqe, $fd, $buf, $len, 0);
+  $sqe.union-flags = $flags;
+}
+
 #multi sub io_uring_register_files(io_uring, Pointer[int32] $files, uint32 $num_files) returns int32 is native(LIB) { ... }
 
 #multi sub io_uring_register_files(io_uring $ring, @files where .all.^can("native-descriptor"), uint32 $num_files) returns int32 {
@@ -618,6 +640,10 @@ sub EXPORT() {
     '&io_uring_prep_poll_add' => &io_uring_prep_poll_add,
     '&io_uring_prep_poll_remove' => &io_uring_prep_poll_remove,
     '&io_uring_prep_cancel' => &io_uring_prep_cancel,
+    '&io_uring_prep_accept' => &io_uring_prep_accept,
+    '&io_uring_prep_connect' => &io_uring_prep_connect,
+    '&io_uring_prep_send' => &io_uring_prep_send,
+    '&io_uring_prep_recv' => &io_uring_prep_recv,
   );
   my %base = %(|%constants, |%types, |%subs, |%export-types);
   %base<%IO_URING_RAW_EXPORT> = %(|%constants, |%export-types);
