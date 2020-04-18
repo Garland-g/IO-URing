@@ -18,6 +18,21 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     method !slot(--> Int) is rw { $!slot }
   }
 
+  my class Submission {
+    has int $.opcode = 0;
+    has int $.flags = 0;
+    has uint $.ioprio = 0;
+    has int $.fd = -1;
+    has uint $.off = 0;
+    has uint $.addr = 0;
+    has uint $.len = 0;
+    has uint $.union-flags = 0;
+    has uint $.buf_index = 0;
+    has uint $.personality = 0;
+    has $.data;
+    has &.then;
+  }
+
   my \tweak-flags = IORING_SETUP_CLAMP;
 
   has io_uring $!ring .= new;
