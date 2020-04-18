@@ -198,15 +198,57 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $p;
   }
 
-  multi method readv($fd, *@bufs, Int :$offset = 0, :$data = 0, :$drain, :$link --> Handle) {
-    self.readv($fd, @bufs, :$offset, :$data, :$drain, :$link);
+  multi method prep-readv($fd, *@bufs, Int :$offset = 0, :$data,
+                         Int :$ioprio = 0, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    self.prep-readv($fd, @bufs, :$offset, :$ioprio, :$data, :$drain, :$link, :$hard-link, :$force-async);
   }
 
-  multi method readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$drain, :$link --> Handle) {
-    self!readv($fd, to-read-bufs(@bufs), :$offset, :$data, :$drain, :$link);
+  multi method prep-readv($fd, @bufs, Int :$offset = 0, :$data,
+                          Int :$ioprio = 0, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    self!prep-readv($fd, to-read-bufs(@bufs), :$offset, :$data, :$ioprio, :$drain, :$link, :$hard-link, :$force-async);
   }
 
-  method !readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$drain, :$link --> Handle) {
+  method !prep-readv($fd, @bufs, Int :$offset = 0, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async) {
+    my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
+    my uint $len = @bufs.elems;
+    my CArray[size_t] $iovecs .= new;
+    my $pos = 0;
+    my @iovecs;
+    for @bufs -> $buf {
+      my iovec $iov .= new($buf);
+      $iovecs[$pos] = +$iov.Pointer;
+      $iovecs[$pos + 1] = $iov.elems;
+      @iovecs.push($iov);
+      $pos += 2;
+    }
+    return Submission.new(
+                          :opcode(IORING_OP_READV),
+                          :$flags,
+                          :$ioprio,
+                          :fd($fd.native-descriptor),
+                          :off($offset),
+                          :addr(+nativecast(Pointer, $iovecs)),
+                          :$len,
+                          :$data,
+                          :then(-> $val {
+                            for ^@bufs.elems -> $i {
+                              @bufs[$i] = @iovecs[$i].Blob;
+                              @iovecs[$i].free;
+                            }
+                            $val.result;
+                          }),
+                         );
+  }
+
+  multi method readv($fd, *@bufs, Int :$offset = 0, :$data = 0, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    self.readv($fd, @bufs, :$offset, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  }
+
+  multi method readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    self!readv($fd, to-read-bufs(@bufs), :$offset, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  }
+
+  method !readv($fd, @bufs, Int :$offset = 0, :$data = 0, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my $num_vr = @bufs.elems;
     my CArray[size_t] $iovecs .= new;
     my $pos = 0;
@@ -236,11 +278,50 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $p
   }
 
-  multi method writev($fd, *@bufs, Int :$offset = 0, :$data = 0, :$enc = 'utf-8', :$drain, :$link --> Handle) {
-    self.writev($fd, @bufs, :$offset, :$data, :$enc, :$drain, :$link);
+  multi method prep-writev($fd, *@bufs, Int :$offset = 0, Int :$ioprio = 0, :$data, :$enc = 'utf-8', :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    self.prep-writev($fd, @bufs, :$offset, :$data, :$enc, :$drain, :$link, :$hard-link, :$force-async);
   }
 
-  multi method writev($fd, @bufs, Int :$offset = 0, :$data = 0, :$enc = 'utf-8', :$drain, :$link --> Handle) {
+  multi method prep-writev($fd, @bufs, Int :$offset = 0, Int :$ioprio = 0, :$data, :$enc = 'utf-8', :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    self!prep-writev($fd, to-write-bufs(@bufs, :$enc), :$offset, :$ioprio, :$data, :$link);
+  }
+
+  method !prep-writev($fd, @bufs, Int :$offset = 0, Int :$ioprio = 0, :$data, :$enc = 'utf-8', :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
+    my uint $len = @bufs.elems;
+    my CArray[size_t] $iovecs .= new;
+    my @iovecs;
+    my $pos = 0;
+    for @bufs -> $buf {
+      my iovec $iov .= new($buf);
+      $iovecs[$pos] = +$iov.Pointer;
+      $iovecs[$pos + 1] = $iov.elems;
+      @iovecs.push($iov);
+      $pos += 2;
+    }
+    return Submission.new(
+                          :opcode(IORING_OP_WRITEV),
+                          :$flags,
+                          :$ioprio,
+                          :fd($fd.native-descriptor),
+                          :off($offset),
+                          :addr(+nativecast(Pointer, $iovecs)),
+                          :$len,
+                          :$data,
+                          :then(-> $val {
+                            for @iovecs -> $iov {
+                              $iov.free;
+                            }
+                            $val.result;
+                          }),
+                         );
+  }
+
+  multi method writev($fd, *@bufs, Int :$offset = 0, :$data, :$enc = 'utf-8', :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    self.writev($fd, @bufs, :$offset, :$data, :$enc, :$drain, :$link, :$hard-link, :$force-async);
+  }
+
+  multi method writev($fd, @bufs, Int :$offset = 0, :$data, :$enc = 'utf-8', :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self!writev($fd, to-write-bufs(@bufs, :$enc), :$offset, :$data, :$link);
   }
 
