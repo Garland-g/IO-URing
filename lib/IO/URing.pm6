@@ -354,7 +354,22 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $p;
   }
 
-  method fsync($fd, UInt $flags, :$data, :$drain, :$link --> Handle) {
+  method prep-fsync($fd, UInt $union-flags, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
+    return Submission.new(
+                  :opcode(IORING_OP_FSYNC),
+                  :$flags,
+                  :$ioprio,
+                  :fd($fd.native-descriptor),
+                  :off(0),
+                  :addr(0),
+                  :len(0),
+                  :union-flags($union-flags +& 0xFFFFFFFF),
+                  :$data,
+                  );
+  }
+
+  method fsync($fd, UInt $flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
       my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
