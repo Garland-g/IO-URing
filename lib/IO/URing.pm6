@@ -114,9 +114,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     return $tmp;
   }
 
-  method !submit(io_uring_sqe $sqe is rw, :$drain, :$link) {
+  method !submit(io_uring_sqe $sqe is rw, :$drain, :$link, :$hard-link, :$force-async) {
     $sqe.flags +|= IOSQE_IO_LINK if $link;
     $sqe.flags +|= IOSQE_IO_DRAIN if $drain;
+    $sqe.flags +|= IOSQE_IO_HARDLINK if $hard-link;
+    $sqe.flags +|= IOSQE_ASYNC if $force-async;
     io_uring_submit($!ring);
   }
 
