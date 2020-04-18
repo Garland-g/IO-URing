@@ -193,7 +193,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       io_uring_prep_nop($sqe);
       $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
-      self!submit($sqe, :$drain, :$link);
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
     }
     $p;
   }
@@ -273,7 +273,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(Pointer[size_t], $iovecs), $num_vr, $offset);
       $sqe.user_data = self!store($promise.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
-      self!submit($sqe, :$drain, :$link);
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
     }
     $p
   }
@@ -325,7 +325,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self!writev($fd, to-write-bufs(@bufs, :$enc), :$offset, :$data, :$link);
   }
 
-  method !writev($fd, @bufs, Int :$offset, :$data, :$drain, :$link --> Handle) {
+  method !writev($fd, @bufs, Int :$offset, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my $num_vr = @bufs.elems;
     my CArray[size_t] $iovecs .= new;
     my @iovecs;
@@ -349,7 +349,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(Pointer[size_t], $iovecs), $num_vr, $offset);
       $sqe.user_data = self!store($promise.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
-      self!submit($sqe, :$drain, :$link);
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
     }
     $p;
   }
@@ -376,12 +376,12 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       io_uring_prep_fsync($sqe, $fd.native-descriptor, $flags);
       $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
-      self!submit($sqe, :$drain, :$link);
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
     }
     $p;
   }
 
-  method poll-add($fd, UInt $poll-mask, :$data, :$drain, :$link --> Handle) {
+  method poll-add($fd, UInt $poll-mask, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my $user_data;
     my Handle $p .= new;
     $!ring-lock.protect: {
@@ -390,12 +390,12 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       $user_data = self!store($p.vow, $sqe, $data // Nil);
       $sqe.user_data = $user_data;
       $p!Handle::slot = $user_data;
-      self!submit($sqe, :$drain, :$link);
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
     }
     $p;
   }
 
-  method poll-remove(Handle $slot, :$data, :$drain, :$link --> Handle) {
+  method poll-remove(Handle $slot, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
       my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
@@ -403,12 +403,12 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       io_uring_prep_poll_remove($sqe, $slot!Handle::slot);
       $sqe.user_data = $user_data;
       $p!Handle::slot = $sqe.user_data;
-      self!submit($sqe, :$drain, :$link);
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
     }
     $p;
   }
 
-  method cancel(Handle $slot, UInt :$flags = 0, :$drain, :$link --> Handle) {
+  method cancel(Handle $slot, UInt :$flags = 0, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
       my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
@@ -416,7 +416,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       io_uring_prep_cancel($sqe, $flags, $user_data);
       $sqe.user_data = $user_data;
       $p!Handle::slot = $sqe.user_data;
-      self!submit($sqe, :$drain, :$link);
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
     }
     $p
   }
