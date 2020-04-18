@@ -381,6 +381,20 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $p;
   }
 
+  method prep-poll-add($fd, UInt $poll-mask, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
+    return Submission.new(
+                          :opcode(IORING_OP_POLL_ADD),
+                          :$flags,
+                          :$ioprio,
+                          :fd($fd.native-descriptor),
+                          :off(0),
+                          :addr(0),
+                          :len(0),
+                          :$data,
+                         );
+  }
+
   method poll-add($fd, UInt $poll-mask, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my $user_data;
     my Handle $p .= new;
@@ -393,6 +407,20 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
     }
     $p;
+  }
+
+  method prep-poll-remove(Handle $slot, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
+    return Submission.new(
+                          :opcode(IORING_OP_POLL_REMOVE),
+                          :$flags,
+                          :$ioprio,
+                          :fd(-1),
+                          :off(0),
+                          :addr($slot!Handle::slot),
+                          :len(0),
+                          :$data,
+                          );
   }
 
   method poll-remove(Handle $slot, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
