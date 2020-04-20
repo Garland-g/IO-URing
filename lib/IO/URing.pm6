@@ -8,8 +8,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   my class Completion {
     has $.data;
     has io_uring_sqe $.request;
-    has Int $.result;
-    has Int $.flags;
+    has int $.result;
+    has int $.flags;
   }
 
   my class Handle is Promise {
@@ -129,11 +129,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     return $tmp;
   }
 
-  method !submit(io_uring_sqe $sqe is rw, :$drain, :$link, :$hard-link, :$force-async) {
-    $sqe.flags +|= IOSQE_IO_LINK if $link;
-    $sqe.flags +|= IOSQE_IO_DRAIN if $drain;
-    $sqe.flags +|= IOSQE_IO_HARDLINK if $hard-link;
-    $sqe.flags +|= IOSQE_ASYNC if $force-async;
+  method !submit(io_uring_sqe \sqe, :$drain, :$link, :$hard-link, :$force-async) {
+    sqe.flags +|= IOSQE_IO_LINK if $link;
+    sqe.flags +|= IOSQE_IO_DRAIN if $drain;
+    sqe.flags +|= IOSQE_IO_HARDLINK if $hard-link;
+    sqe.flags +|= IOSQE_ASYNC if $force-async;
     io_uring_submit($!ring);
   }
 
@@ -146,7 +146,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $!ring-lock.protect: {
       @handles = do for @submissions -> Submission $sub {
         my Handle $p .= new;
-        my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+        my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
         $p.break(Failure.new("No more room in ring")) unless $sqe.defined;
         $sqe.opcode = $sub.opcode;
         $sqe.flags = $sub.flags;
@@ -189,7 +189,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   method nop(:$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
       io_uring_prep_nop($sqe);
       $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
@@ -269,7 +269,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       $val.result;
     });
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
       io_uring_prep_readv($sqe, $fd.native-descriptor, nativecast(Pointer[size_t], $iovecs), $num_vr, $offset);
       $sqe.user_data = self!store($promise.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
@@ -345,7 +345,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       $val.result;
     });
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
       io_uring_prep_writev($sqe, $fd.native-descriptor, nativecast(Pointer[size_t], $iovecs), $num_vr, $offset);
       $sqe.user_data = self!store($promise.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
@@ -372,7 +372,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   method fsync($fd, UInt $flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
       io_uring_prep_fsync($sqe, $fd.native-descriptor, $flags);
       $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
@@ -399,7 +399,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     my $user_data;
     my Handle $p .= new;
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
       io_uring_prep_poll_add($sqe, $fd, $poll-mask);
       $user_data = self!store($p.vow, $sqe, $data // Nil);
       $sqe.user_data = $user_data;
@@ -426,7 +426,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   method poll-remove(Handle $slot, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
       my Int $user_data = self!store($p.vow, $sqe, $data // Nil);
       io_uring_prep_poll_remove($sqe, $slot!Handle::slot);
       $sqe.user_data = $user_data;
@@ -439,7 +439,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   method cancel(Handle $slot, UInt :$flags = 0, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
       my Int $user_data = $slot!Handle::slot;
       io_uring_prep_cancel($sqe, $flags, $user_data);
       $sqe.user_data = $user_data;
@@ -452,7 +452,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   method accept($fd, $sockaddr?, Int :$flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
       io_uring_prep_accept($sqe, $fd, $flags, $sockaddr);
       $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
@@ -464,7 +464,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   method connect($fd, $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
       io_uring_prep_connect($sqe, $fd, $sockaddr);
       $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
@@ -480,8 +480,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   multi method send($fd, Blob $buf, Int :$flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-      io_uring_prep_send($sqe, $fd, nativecast(Pointer[void], $buf), $buf.bytes, $flags);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
+      io_uring_prep_send($sqe, $fd, $iov.iov_base, $iov.iov_len, $flags);
       $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
       self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
@@ -492,8 +492,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   multi method recv($fd, Blob $buf, Int :$flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
-      my io_uring_sqe $sqe = io_uring_get_sqe($!ring);
-      io_uring_prep_recv($sqe, $fd, nativecast(Pointer[void], $buf), $buf.bytes, $flags);
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
+      io_uring_prep_recv($sqe, $fd, $iov.iov_base, $iov.iov_len, $flags);
       $sqe.user_data = self!store($p, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
       self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
