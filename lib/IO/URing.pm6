@@ -41,7 +41,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   has Lock::Async $!storage-lock .= new;
   has @!storage is default(STORAGE::EMPTY);
 
-  submethod TWEAK(UInt :$entries!, UInt :$flags = tweak-flags, Int :$cq-size, Int :$at-once = 1) {
+  submethod TWEAK(UInt :$entries!, UInt :$flags = tweak-flags, Int :$cq-size) {
     $!params.flags = $flags;
     if $cq-size.defined && $cq-size >= $entries {
       given log2($cq-size) {
@@ -54,18 +54,16 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     start {
       loop {
         my Pointer[io_uring_cqe] $cqe_ptr .= new;
-        my $completed := io_uring_peek_batch_cqe($!ring, $cqe_ptr, $at-once);
-        unless +$cqe_ptr {
-          Thread.yield;
-          next;
+        my $completed := io_uring_wait_cqe($!ring, $cqe_ptr);
+        if +$cqe_ptr > 0 {
+          my io_uring_cqe $temp := $cqe_ptr.deref;
+          my ($vow, $request, $data) = self!retrieve($temp.user_data);
+          my $flags = $temp.flags;
+          my $result = $temp.res;
+          io_uring_cqe_seen($!ring, $cqe_ptr.deref);
+          my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
+          $vow.keep($cmp);
         }
-        my io_uring_cqe $temp := $cqe_ptr.deref;
-        my ($vow, $request, $data) = self!retrieve($temp.user_data);
-        my $flags = $temp.flags;
-        my $result = $temp.res;
-        io_uring_cqe_seen($!ring, $cqe_ptr.deref);
-        my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
-        $vow.keep($cmp);
       }
       CATCH {
         default {
