@@ -76,16 +76,20 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   submethod DESTROY() {
-    if $!ring ~~ io_uring:D {
-      $!ring-lock.protect: { io_uring_queue_exit($!ring) };
+    $!ring-lock.protect: {
+      if $!ring ~~ io_uring:D {
+        io_uring_queue_exit($!ring)
+      }
     }
   }
 
   method close() {
-    if $!ring ~~ io_uring:D {
-      $!ring-lock.protect: { io_uring_queue_exit($!ring) };
-      $!ring = io_uring;
-    }
+    $!ring-lock.protect: {
+      if $!ring ~~ io_uring:D {
+        io_uring_queue_exit($!ring);
+        $!ring = io_uring;
+      }
+    };
   }
 
   method features() {
