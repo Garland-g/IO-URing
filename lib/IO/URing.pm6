@@ -483,7 +483,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     my Handle $p .= new;
     $!ring-lock.protect: {
       my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
-      io_uring_prep_send($sqe, $fd, $iov.iov_base, $iov.iov_len, $flags);
+      io_uring_prep_send($sqe, $fd, nativecast(Pointer[void], $buf), $buf.bytes, $flags);
       $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
       self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
@@ -495,7 +495,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     my Handle $p .= new;
     $!ring-lock.protect: {
       my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
-      io_uring_prep_recv($sqe, $fd, $iov.iov_base, $iov.iov_len, $flags);
+      io_uring_prep_recv($sqe, $fd, nativecast(Pointer[void], $buf), $buf.bytes, $flags);
       $sqe.user_data = self!store($p, $sqe, $data // Nil);
       $p!Handle::slot = $sqe.user_data;
       self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
