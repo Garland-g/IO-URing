@@ -65,50 +65,38 @@ role IO::URing::Socket is export {
       my $lock = Lock::Async.new;
       my $tap;
       my $handle;
+      my $cancellation;
       $lock.protect: {
-        #`{
         # UDP
-          $handle = $!ring.recvmsg($!socket, $buffer).then: -> $cmp {
-            $lock.protect: {
-              my \err := $cmp.result;
-              my \data := $cmp.request.data;
-              unless $finished {
-                if err <= 0 {
-                  quit(X::AdHoc.new(payload => err));
-                  $finished = 1;
-                }
-                elsif err >= 0 {
-                  emit-events();
-                }
-                else {
-                  emit-events();
-                }
-              }
-            }
-          };
-          #}
-        my $cancellation := $!scheduler.cue: -> {
-          loop {
-            $handle = $!ring.recv($!socket, $buffer);
-            await $handle.then: -> $cmp {
-              $lock.protect: {
-                my \err := $cmp.result.result;
-                unless $finished {
-                  if err < 0 {
-                    quit(X::AdHoc.new(payload => err));
-                    $finished = 1;
-                  }
-                  elsif err > 0 {
-                    emit($buffer.subbuf(^err));
-                  }
-                  else {
-                    $finished = 1;
-                    done();
+        if $!dgram {
+        }
+        else {
+          #TCP
+          $cancellation := $!scheduler.cue: -> {
+            loop {
+              $handle = $!ring.recv($!socket, $buffer);
+              await $handle.then: -> $cmp {
+                $lock.protect: {
+                  unless $finished {
+                    if $cmp ~~ Exception {
+                      quit(x::AdHoc.new(strerror($cmp)));
+                      $finished = 1;
+                    }
+                    else {
+                      my \bytes := $cmp.result.result;
+                      if bytes > 0 {
+                        emit($buffer.subbuf(^bytes));
+                      }
+                      else {
+                        $finished = 1;
+                        done();
+                      }
+                    }
                   }
                 }
               }
+              last if $finished;
             }
-            last if $finished;
           }
         }
         $tap := Tap.new({ $cancellation.cancel(); });

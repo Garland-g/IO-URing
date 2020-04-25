@@ -1,7 +1,7 @@
 use IO::URing::Raw;
 use NativeCall;
 use NativeHelpers::Blob;
-use Constants::Sys::Socket :AF;
+use Constants::Sys::Socket :AF, :SOCK;
 
 subset Port of Int where 0 <= * <= 65535;
 
