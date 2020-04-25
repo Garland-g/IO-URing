@@ -1,5 +1,7 @@
 use v6;
 use IO::URing::Raw;
+use Universal::errno;
+
 use NativeCall;
 
 class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
@@ -58,11 +60,18 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
         if +$cqe_ptr > 0 {
           my io_uring_cqe $temp := $cqe_ptr.deref;
           my ($vow, $request, $data) = self!retrieve($temp.user_data);
-          my $flags = $temp.flags;
           my $result = $temp.res;
+          my $flags = $temp.flags;
           io_uring_cqe_seen($!ring, $cqe_ptr.deref);
           my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
-          $vow.keep($cmp);
+          if $result < 0 {
+            set_errno(-$result);
+            $vow.break(errno);
+            set_errno(0);
+          }
+          else {
+            $vow.keep($cmp);
+          }
         }
       }
       CATCH {
