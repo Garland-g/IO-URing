@@ -1,5 +1,6 @@
 use v6;
 use IO::URing::Raw;
+use IO::URing::Socket::Raw :ALL;
 use Universal::errno;
 
 use NativeCall;

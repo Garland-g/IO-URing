@@ -4,7 +4,7 @@ die "Must be loaded on Linux 5.1 or higher"
   unless $*KERNEL ~~ 'linux' && $version ~~ v5.1+;
 
 use NativeCall;
-use Unix::Socket::Raw :ALL;
+use IO::URing::Socket::Raw :ALL;
 #use Universal::errno;
 
 my constant LIB = "uring";
@@ -91,58 +91,6 @@ my constant IORING_OP_EPOLL_CTL = 29;
 
 my constant IORING_ENTER_GETEVENTS = 1;
 my constant IORING_ENTER_SQ_WAKEUP = 2;
-
-sub free(Pointer) is native is export { ... }
-
-sub memcpy(Pointer[void], Pointer[void], size_t) returns Pointer[void] is native is export {...}
-
-sub malloc(size_t $size) returns Pointer[void] is native { ... }
-
-class iovec is repr('CStruct') is rw {
-  has Pointer[void] $.iov_base;
-  has size_t $.iov_len;
-
-  submethod BUILD(Pointer:D :$iov_base, Int:D :$iov_len) {
-    $!iov_base := $iov_base;
-    $!iov_len = $iov_len;
-  }
-
-  method free(iovec:D:) {
-    free(nativecast(Pointer[void], self));
-  }
-
-  multi method new(Str $str --> iovec) {
-    self.new($str.encode);
-  }
-
-  multi method new(Blob $blob --> iovec) {
-    my $ptr = malloc($blob.bytes);
-    memcpy($ptr, nativecast(Pointer[void], $blob), $blob.bytes);
-    self.bless(:iov_base($ptr), :iov_len($blob.bytes));
-  }
-
-  multi method new(CArray[size_t] $arr, UInt $pos) {
-    self.bless(:iov_base($arr[$pos]), :iov_len($arr[$pos + 1]));
-  }
-
-  multi method new(size_t :$ptr, size_t :$len) {
-    self.bless(:iov_base($ptr), :iov_len($len))
-  }
-
-  method Blob {
-    my buf8 $buf .= allocate($!iov_len);
-    memcpy(nativecast(Pointer[void], $buf), $!iov_base, $!iov_len);
-    $buf;
-  }
-
-  method elems {
-    $!iov_len
-  }
-
-  method Pointer {
-    $!iov_base;
-  }
-}
 
 class kernel_timespec is repr('CStruct') is rw {
   has uint64 $tv_sec;
@@ -503,6 +451,16 @@ sub io_uring_prep_poll_remove(io_uring_sqe $sqe, Int $user_data --> Nil) {
   io_uring_prep_rw(IORING_OP_POLL_REMOVE, $sqe, -1, $user_data, 0, 0);
 }
 
+sub io_uring_prep_recvmsg(io_uring_sqe $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) {
+  io_uring_prep_rw(IORING_OP_RECVMSG, $sqe, $fd, $msg, 1, 0);
+  $sqe.union-flags = $flags;
+}
+
+sub io_uring_prep_sendmsg(io_uring_sqe $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) {
+  io_uring_prep_rw(IORING_OP_SENDMSG, $sqe, $fd, $msg, 1, 0);
+  $sqe.union-flags = $flags;
+}
+
 sub io_uring_prep_cancel(io_uring_sqe $sqe, UInt $flags, Int $user_data --> Nil) {
   io_uring_prep_rw(IORING_OP_ASYNC_CANCEL, $sqe, -1, $user_data, 0, 0);
   $sqe.union-flags = $flags;
@@ -639,6 +597,8 @@ sub EXPORT() {
     '&io_uring_prep_fsync' => &io_uring_prep_fsync,
     '&io_uring_prep_poll_add' => &io_uring_prep_poll_add,
     '&io_uring_prep_poll_remove' => &io_uring_prep_poll_remove,
+    '&io_uring_prep_sendmsg' => &io_uring_prep_sendmsg,
+    '&io_uring_prep_recvmsg' => &io_uring_prep_recvmsg,
     '&io_uring_prep_cancel' => &io_uring_prep_cancel,
     '&io_uring_prep_accept' => &io_uring_prep_accept,
     '&io_uring_prep_connect' => &io_uring_prep_connect,

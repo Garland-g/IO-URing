@@ -1,4 +1,3 @@
-use IO::URing::Raw;
 use NativeCall;
 use NativeHelpers::Blob;
 use Constants::Sys::Socket :AF, :SOCK;
@@ -502,15 +501,160 @@ class ipv6_mreq is repr('CStruct') is export(:ipv6_mreq) {
   }
 }
 
-class msghdr is repr('CStruct') is export(:msghdr) is rw {
-  has Pointer $.msg_name;
+sub free(Pointer) is native is export { ... }
+
+sub memcpy(Pointer[void], Pointer[void], size_t) returns Pointer[void] is native is export {...}
+
+sub malloc(size_t $size) returns Pointer[void] is native { ... }
+
+class iovec is repr('CStruct') is rw {
+  has Pointer[void] $.iov_base;
+  has size_t $.iov_len;
+
+  submethod BUILD(Pointer:D :$iov_base, Int:D :$iov_len) {
+    $!iov_base := $iov_base;
+    $!iov_len = $iov_len;
+  }
+
+  method free(iovec:D:) {
+    free(nativecast(Pointer[void], self));
+  }
+
+  multi method new(Str $str --> iovec) {
+    self.new($str.encode);
+  }
+
+  multi method new(Blob $blob --> iovec) {
+    my $ptr = malloc($blob.bytes);
+    memcpy($ptr, nativecast(Pointer[void], $blob), $blob.bytes);
+    self.bless(:iov_base($ptr), :iov_len($blob.bytes));
+  }
+
+  multi method new(CArray[size_t] $arr, UInt $pos) {
+    self.bless(:iov_base($arr[$pos]), :iov_len($arr[$pos + 1]));
+  }
+
+  multi method new(size_t :$ptr, size_t :$len) {
+    self.bless(:iov_base($ptr), :iov_len($len))
+  }
+
+  method Blob {
+    my buf8 $buf .= allocate($!iov_len);
+    memcpy(nativecast(Pointer[void], $buf), $!iov_base, $!iov_len);
+    $buf;
+  }
+
+  method elems {
+    $!iov_len
+  }
+
+  method Pointer {
+    $!iov_base;
+  }
+}
+
+enum AddrInfo-Flags (
+        AI_PASSIVE                  => 0x0001;
+        AI_CANONNAME                => 0x0002;
+        AI_NUMERICHOST              => 0x0004;
+        AI_V4MAPPED                 => 0x0008;
+        AI_ALL                      => 0x0010;
+        AI_ADDRCONFIG               => 0x0020;
+        AI_IDN                      => 0x0040;
+        AI_CANONIDN                 => 0x0080;
+        AI_IDN_ALLOW_UNASSIGNED     => 0x0100;
+        AI_IDN_USE_STD3_ASCII_RULES => 0x0200;
+        AI_NUMERICSERV              => 0x0400;
+        );
+
+class Addrinfo is repr('CStruct') {
+  has int32 $.ai_flags;
+  has int32 $.ai_family;
+  has int32 $.ai_socktype;
+  has int32 $.ai_protocol;
+  has int32 $.ai_addrlen;
+  has sockaddr $.ai_addr is rw;
+  has Str $.ai_cannonname is rw;
+  has Addrinfo $.ai_next is rw;
+
+  method flags {
+    do for AddrInfo-Flags.enums { .key if $!ai_flags +& .value }
+  }
+
+  method family {
+    AF($!ai_family)
+  }
+
+  method socktype {
+    SOCK($!ai_socktype)
+  }
+
+  method address {
+    given $.family {
+      when AF::INET {
+        ~nativecast(in_addr, $!ai_addr)
+      }
+      when AF::INET6 {
+        ~nativecast(in6_addr, $!ai_addr)
+      }
+    }
+  }
+}
+
+# TCP is done through IORING_OP_SEND and IORING_OP_RECV so
+# only make helpers for UDP/datagram sockets with msghdr
+class msghdr is repr('CStruct') is rw is export(:msghdr) {
+  has size_t $.msg_name;
   has int32 $.msg_namelen;
-  has CArray[iovec] $.msg_iov;
+  has CArray[size_t] $.msg_iov; # Budget iovec
   has size_t $.msg_iovlen;
   has Pointer $.msg_control;
   has size_t $.msg_controllen;
-  has int $.msg_flags;
+  has int32 $.msg_flags;
+
+  submethod BUILD(size_t :$iovlen = 1) {
+    $!msg_iov := CArray[size_t].new(0 xx (2 * $iovlen));
+    $!msg_iovlen = $iovlen;
+    $!msg_controllen = 0;
+  }
+
+  multi method prep-send(Addrinfo $info, @msg where Str ~~ any(*), Str $name? = Str, :$enc = 'utf-8') {
+    for @msg -> $msg is rw {
+      $msg = $msg.encode($enc) if $msg ~~ Str;
+    }
+    self.fill($info, @msg, $name);
+  }
+
+  multi method prep-send(Addrinfo $info, @msg, Str $name? = Str) {
+    my $iov_cnt = 1;
+    for @msg -> $msg {
+      fail "Too many iovs for this msghdr" unless $iov_cnt <= $!msg_iovlen;
+      $!msg_iov[2 * $iov_cnt] = +nativecast(Pointer, $msg);
+      $!msg_iov[2 * $iov_cnt + 1] = $msg.bytes;
+    }
+    fail "Need a destination" without $name;
+  }
+
+  method prep-recv(Addrinfo $info, @msg, Blob $name? = Blob) {
+    my $iov_cnt = 1;
+    for @msg -> $msg {
+      fail "Too many iovs for this msghdr" unless $iov_cnt <= $!msg_iovlen;
+      $!msg_iov[2 * $iov_cnt] = +nativecast(Pointer, $msg);
+      $!msg_iov[2 * $iov_cnt + 1] = $msg.bytes;
+    }
+    with $name {
+
+    }
+    else {
+      $!msg_name = Pointer.new;
+      $!msg_namelen = 0;
+    }
+  }
 }
+
+sub getaddrinfo( Str $node, Str $service, Addrinfo $hints, Pointer $res is rw ) returns int32 is native { ... }
+
+sub freeaddrinfo(Pointer) is native {}
 
 constant sockfd is export(:socket) = int32;
 
