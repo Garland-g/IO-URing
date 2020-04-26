@@ -448,6 +448,37 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $p;
   }
 
+  multi method sendto($fd, Str $str, Int $flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async, :$enc = 'utf-8' --> Handle) {
+    self.sendto($fd, $str.encode($enc), $flags, $addr, $len, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  }
+
+  multi method sendto($fd, Blob $blob, Int $flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle ) {
+    my msghdr $msg .= new;
+    $msg.msg_name = 0;
+    $msg.msg_controllen = 0;
+    $msg.msg_namelen = 0;
+    $msg.msg_iovlen = 1;
+    $msg.msg_iov[0] = +nativecast(Pointer, $blob);
+    $msg.msg_iov[1] = $blob.bytes;
+    with $addr {
+      $msg.msg_name = nativecast(Pointer, $addr);
+      $msg.msg_namelen = $len;
+    }
+    self.sendmsg($fd, $msg, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  }
+
+  method sendmsg($fd, msghdr:D $msg, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    my Handle $p .= new;
+    $!ring-lock.protect: {
+      my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
+      io_uring_prep_sendmsg($sqe, $fd, nativecast(Pointer, $msg), $flags);
+      $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
+      $p!Handle::slot = $sqe.user_data;
+      self!submit($sqe, :$drain, :$link, :$hard-link, :$force-async);
+    }
+    $p;
+  }
+
   method cancel(Handle $slot, UInt :$flags = 0, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my Handle $p .= new;
     $!ring-lock.protect: {
