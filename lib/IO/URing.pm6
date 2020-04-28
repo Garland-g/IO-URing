@@ -448,11 +448,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $p;
   }
 
-  multi method sendto($fd, Str $str, Int $flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async, :$enc = 'utf-8' --> Handle) {
-    self.sendto($fd, $str.encode($enc), $flags, $addr, $len, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  multi method prep-sendto($fd, Str $str, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async, :$enc = 'utf-8' --> Submission) {
+    self.prep-sendto($fd, $str.encode($enc), $union-flags, $addr, $len, :$data, :$drain, :$link, :$hard-link, :$force-async);
   }
 
-  multi method sendto($fd, Blob $blob, Int $flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle ) {
+  multi method prep-sendto($fd, Blob $blob, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission ) {
     my msghdr $msg .= new;
     $msg.msg_name = 0;
     $msg.msg_controllen = 0;
@@ -464,7 +464,41 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       $msg.msg_name = nativecast(Pointer, $addr);
       $msg.msg_namelen = $len;
     }
-    self.sendmsg($fd, $msg, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async);
+    self.prep-sendmsg($fd, $msg, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  }
+
+  multi method sendto($fd, Str $str, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async, :$enc = 'utf-8' --> Handle) {
+    self.sendto($fd, $str.encode($enc), $union-flags, $addr, $len, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  }
+
+  multi method sendto($fd, Blob $blob, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle ) {
+    my msghdr $msg .= new;
+    $msg.msg_name = 0;
+    $msg.msg_controllen = 0;
+    $msg.msg_namelen = 0;
+    $msg.msg_iovlen = 1;
+    $msg.msg_iov[0] = +nativecast(Pointer, $blob);
+    $msg.msg_iov[1] = $blob.bytes;
+    with $addr {
+      $msg.msg_name = nativecast(Pointer, $addr);
+      $msg.msg_namelen = $len;
+    }
+    self.sendmsg($fd, $msg, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  }
+
+  multi method prep-sendmsg(Int $fd, msghdr:D $msg, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
+    return Submission.new(
+                          :opcode(IORING_OP_SENDMSG),
+                          :$flags,
+                          :ioprio(0),
+                          :$fd,
+                          :off(0),
+                          :$union-flags,
+                          :addr(+nativecast(Pointer, $msg)),
+                          :len(0),
+                          :$data
+                          )
   }
 
   method sendmsg($fd, msghdr:D $msg, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
