@@ -505,7 +505,7 @@ sub free(Pointer) is native is export { ... }
 
 sub memcpy(Pointer[void], Pointer[void], size_t) returns Pointer[void] is native is export {...}
 
-sub malloc(size_t $size) returns Pointer[void] is native { ... }
+sub malloc(size_t $size) returns Pointer[void] is native is export { ... }
 
 class iovec is repr('CStruct') is rw {
   has Pointer[void] $.iov_base;

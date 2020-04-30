@@ -42,7 +42,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   has io_uring_params $!params .= new;
   has Lock::Async $!ring-lock .= new;
   has Lock::Async $!storage-lock .= new;
-  has @!storage is default(STORAGE::EMPTY);
+  has %!storage is default(STORAGE::EMPTY);
 
   submethod TWEAK(UInt :$entries!, UInt :$flags = tweak-flags, Int :$cq-size) {
     $!params.flags = $flags;
@@ -86,6 +86,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   submethod DESTROY() {
     $!ring-lock.protect: {
       if $!ring ~~ io_uring:D {
+        $!storage-lock.protect: {
+          for %!storage.keys -> $ptr {
+            free(Pointer[void].new(+$ptr));
+          }
+        }
         io_uring_queue_exit($!ring)
       }
     }
@@ -94,6 +99,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   method close() {
     $!ring-lock.protect: {
       if $!ring ~~ io_uring:D {
+        $!storage-lock.protect: {
+          for %!storage.keys -> $ptr {
+            free(Pointer[void].new(+$ptr));
+          }
+        }
         io_uring_queue_exit($!ring);
         $!ring = io_uring;
       }
@@ -124,20 +134,19 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   method !store($vow, io_uring_sqe $sqe, $user_data --> Int) {
-    my Int $slot = 0;
+    my size_t $ptr = +malloc(1);
     $!storage-lock.protect: {
-      until @!storage[$slot] ~~ STORAGE::EMPTY { $slot++ }
-      @!storage[$slot] = ($vow, $sqe, $user_data);
+      %!storage{$ptr} = ($vow, $sqe, $user_data);
     };
-    $slot;
+    $ptr;
   }
 
   method !retrieve(Int $slot) {
     my $tmp;
     $!storage-lock.protect: {
-      $tmp = @!storage[$slot];
-      @!storage[$slot] = STORAGE::EMPTY;
+      $tmp = %!storage{$slot}:delete;
     };
+    free(Pointer.new($slot));
     return $tmp;
   }
 
