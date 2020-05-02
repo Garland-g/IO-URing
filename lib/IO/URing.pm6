@@ -1,7 +1,7 @@
 use v6;
 use IO::URing::Raw;
 use IO::URing::Socket::Raw :ALL;
-use Universal::errno;
+use Universal::errno::Constants;
 
 use NativeCall;
 
@@ -30,41 +30,70 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   my \tweak-flags = IORING_SETUP_CLAMP;
 
+  my $close-promise;
+  my $close-vow;
   has io_uring $!ring .= new;
+  has int $.entries;
+  has int32 $!eventfd;
   has io_uring_params $!params .= new;
-  has Lock::Async $!ring-lock .= new;
   has Lock::Async $!storage-lock .= new;
   has %!storage is default(STORAGE::EMPTY);
+  has Channel $!queue .= new;
 
-  submethod TWEAK(UInt :$entries!, UInt :$flags = tweak-flags, Int :$cq-size) {
+  submethod TWEAK(UInt :$!entries!, UInt :$flags = tweak-flags, Int :$cq-size) {
+    $close-promise = Promise.new;
+    $close-vow = $close-promise.vow;
     $!params.flags = $flags;
-    if $cq-size.defined && $cq-size >= $entries {
+    if $cq-size.defined && $cq-size >= $!entries {
       given log2($cq-size) {
         $cq-size = 2^($_ + 1) unless $_ ~~ Int;
       }
       $!params.flags +|= IORING_SETUP_CQSIZE;
       $!params.cq_entries = $cq-size;
     }
-    my $result = io_uring_queue_init_params($entries, $!ring, $!params);
+    my $result = io_uring_queue_init_params($!entries, $!ring, $!params);
+    $!eventfd = eventfd(1, 0);
     start {
-      loop {
+        self!arm();
+        io_uring_submit($!ring);
         my Pointer[io_uring_cqe] $cqe_ptr .= new;
-        my $completed := io_uring_wait_cqe($!ring, $cqe_ptr);
+        my $vow;
+        my int $result;
+        my int $flags;
+        my $data;
+        my $request;
+        my uint64 $jobs;
+      loop {
+        my $completed = io_uring_wait_cqe($!ring, $cqe_ptr);
         if +$cqe_ptr > 0 {
           my io_uring_cqe $temp := $cqe_ptr.deref;
-          my ($vow, $request, $data) = self!retrieve($temp.user_data);
-          my $result = $temp.res;
-          my $flags = $temp.flags;
-          io_uring_cqe_seen($!ring, $cqe_ptr.deref);
-          my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
-          if $result < 0 {
-            set_errno(-$result);
-            $vow.break(errno);
-            set_errno(0);
+          if $temp.user_data {
+            ($vow, $request, $data) = self!retrieve($temp.user_data);
+            $result = $temp.res;
+            $flags = $temp.flags;
+            io_uring_cqe_seen($!ring, $cqe_ptr.deref);
+            my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
+            if $result < 0 {
+              $vow.keep(Failure.new(Errno(-$result)));
+            }
+            else {
+              $vow.keep($cmp);
+            }
           }
           else {
-            $vow.keep($cmp);
+            io_uring_cqe_seen($!ring, $cqe_ptr.deref);
+            eventfd_read($!eventfd, $jobs);
+            if $jobs > $!entries {
+              self!close();
+              last;
+            }
+            self!empty-queue();
+            self!arm();
+            io_uring_submit($!ring);
           }
+        }
+        else {
+          die "Got a NULL Pointer from the completion queue";
         }
       }
       CATCH {
@@ -75,31 +104,74 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     }
   }
 
-  submethod DESTROY() {
-    $!ring-lock.protect: {
-      if $!ring ~~ io_uring:D {
-        $!storage-lock.protect: {
-          for %!storage.keys -> $ptr {
-            free(Pointer[void].new(+$ptr));
+  method !arm() {
+    # This only runs on the submission thread
+    my $sqe = io_uring_get_sqe($!ring);
+    without $sqe {
+      # If people are batching to the limit...
+      io_uring_submit($!ring);
+      $sqe = io_uring_get_sqe($!ring);
+    }
+    io_uring_prep_poll_add($sqe, $!eventfd, POLLIN);
+    $sqe.user_data = 0;
+  }
+
+  method !empty-queue() {
+    # This only runs on the submission thread
+    my $v;
+    my $subs;
+    my Handle @handles;
+    loop {
+      if $!queue.poll -> (:key($v), :value($subs)) {
+        @handles = do for @$subs -> Submission $sub {
+          my Handle $p .= new;
+          my $sqe = io_uring_get_sqe($!ring);
+          without $sqe {
+            io_uring_submit($!ring);
+            $sqe = io_uring_get_sqe($!ring);
+          }
+          $p.break(Failure.new("No more room in ring")) unless $sqe.defined;
+          memcpy(nativecast(Pointer, $sqe), nativecast(Pointer, $sub.sqe), nativesizeof($sqe));
+          with $sub.addr {
+            $sqe.addr = $sub.addr ~~ Int ?? $sub.addr !! +nativecast(Pointer, $_);
+          }
+          $sqe.user_data = self!store($p.vow, $sqe, $sub.data // Nil);
+          with $sub.then {
+            my $promise = $p.then($sub.then);
+            $promise!Handle::slot = $sqe.user_data;
+            $promise
+          }
+          else {
+            $p!Handle::slot = $sqe.user_data;
+            $p
           }
         }
-        io_uring_queue_exit($!ring)
+        $v.keep(@handles.elems > 1 ?? @handles !! @handles[0]);
       }
+      else { last }
+    }
+    CATCH {
+      default { die $_ }
     }
   }
 
-  method close() {
-    $!ring-lock.protect: {
-      if $!ring ~~ io_uring:D {
-        $!storage-lock.protect: {
-          for %!storage.keys -> $ptr {
-            free(Pointer[void].new(+$ptr));
-          }
+  method !close() {
+    if $!ring ~~ io_uring:D {
+      $!storage-lock.protect: {
+        for %!storage.keys -> $ptr {
+          free(Pointer[void].new(+$ptr));
         }
-        io_uring_queue_exit($!ring);
-        $!ring = io_uring;
       }
-    };
+      io_uring_queue_exit($!ring);
+      $!ring = io_uring;
+      $close-vow.keep(True);
+    }
+  }
+
+  method close(\SELF: --> Nil) {
+    eventfd_write($!eventfd, $!entries + 1);
+    await $close-promise;
+    SELF = Nil;
   }
 
   method features() {
@@ -142,40 +214,22 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     return $tmp;
   }
 
-  method !submit(io_uring_sqe \sqe, :$drain, :$link, :$hard-link, :$force-async) {
-    sqe.flags +|= IOSQE_IO_LINK if $link;
-    sqe.flags +|= IOSQE_IO_DRAIN if $drain;
-    sqe.flags +|= IOSQE_IO_HARDLINK if $hard-link;
-    sqe.flags +|= IOSQE_ASYNC if $force-async;
-    io_uring_submit($!ring);
-  }
-
   multi method submit(*@submissions --> Array[Handle]) {
     self.submit(@submissions);
   }
 
   multi method submit(@submissions --> Array[Handle]) {
-    my Handle @handles;
-    $!ring-lock.protect: {
-      @handles = do for @submissions -> Submission $sub {
-        my Handle $p .= new;
-        my io_uring_sqe $sqe := io_uring_get_sqe($!ring);
-        $p.break(Failure.new("No more room in ring")) unless $sqe.defined;
-        $sqe.opcode = $sub.opcode;
-        $sqe.flags = $sub.flags;
-        $sqe.ioprio = $sub.ioprio;
-        $sqe.fd = $sub.fd;
-        $sqe.off = $sub.off;
-        $sqe.addr = $sub.addr;
-        $sqe.len = $sub.len;
-        $sqe.union-flags = $sub.union-flags;
-        $sqe.user_data = self!store($p.vow, $sqe, $sub.data // Nil);
-        $sqe.pad0 = $sqe.pad1 = $sqe.pad2 = 0;
-        $sub.then.defined ?? $p.then($sub.then) !! $p;
-      }
-      io_uring_submit($!ring);
-    }
-    @handles
+    my Handle $handles-promise .= new;
+    $!queue.send($handles-promise.vow => @submissions);
+    eventfd_write($!eventfd, @submissions.elems);
+    $handles-promise.result;
+  }
+
+  multi method submit(Submission $sub --> Handle) {
+    my Handle $handle-promise .= new;
+    $!queue.send($handle-promise.vow => $sub);
+    eventfd_write($!eventfd, 1);
+    $handle-promise.result;
   }
 
   sub set-flags(:$drain, :$link, :$hard-link, :$force-async --> int) {
@@ -428,7 +482,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.submit(self.prep-sendmsg($fd, $msg, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
-  method prep-recvfrom($fd, Blob $buf, $flags, Blob $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+  multi method prep-recvfrom($fd, |c --> Submission) {
+    self.prep-recvfrom($fd.native-descriptor, |c);
+  }
+
+  multi method prep-recvfrom(Int $fd, Blob $buf, $flags, Blob $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my msghdr $msg .= new;
     $msg.msg_controllen = 0;
     $msg.msg_name = $addr.defined ?? +nativecast(Pointer, $addr) !! 0;
@@ -443,11 +501,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.submit(self.prep-recvfrom($fd, $buf, $flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
-  multi method prep-recvmsg($fd, |c) {
-    self.prep-recvmsg($fd.native-descriptor, |c);
+  multi method prep-recvmsg($fd, msghdr:D $msg is rw, $union-flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    self.prep-recvmsg($fd.native-descriptor, $msg, $union-flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async);
   }
 
-  multi method prep-recvmsg(Int $fd, msghdr:D $msg is rw, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+  multi method prep-recvmsg(Int $fd, msghdr:D $msg is rw, $union-flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
                           :sqe(io_uring_sqe.new:
@@ -522,7 +580,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-connect($fd.native-descriptor, |c);
   }
 
-  multi method prep-connect(Int $fd, $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+  multi method prep-connect(Int $fd, sockaddr_role $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
                           :sqe(io_uring_sqe.new:
@@ -530,21 +588,21 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                             :$flags,
                             :ioprio(0),
                             :$fd,
-                            :off(0),
+                            :off($sockaddr.size), # Not a bug. This is how connect is done.
                             :union-flags(0),
-                            :len($sockaddr.size),
+                            :len(0),
                           ),
                           :addr($sockaddr),
                           :$data
                           )
   }
 
-  method connect($fd, $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+  method connect($fd, sockaddr_role $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-connect($fd, $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
-  multi method prep-send($fd, |c --> Submission) {
-    self.prep-send($fd.native-descriptor, |c);
+  multi method prep-send($fd, Str $str,  |c --> Submission) {
+    self.prep-send($fd.native-descriptor, $str, |c);
   }
 
   multi method prep-send(Int $fd, Str $str, :$enc = 'utf-8', |c --> Submission) {
@@ -594,7 +652,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   }
 
   multi method recv($fd, Blob $buf, Int $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
-    self.submit(self.recv($fd, $buf, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
+    self.submit(self.prep-recv($fd, $buf, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
 }

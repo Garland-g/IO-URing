@@ -29,5 +29,6 @@ is $completion.data, $data, "Get val {$completion.data} back from kernel";
 is $rbuf1.decode ~ $rbuf2.decode, $val, "Get temp data back from file";
 
 $handle.close;
+$ring.close;
 unlink($*TMPDIR.add($val).IO);
 done-testing;

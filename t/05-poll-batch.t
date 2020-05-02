@@ -20,7 +20,7 @@ $rbuf2 = blob8.allocate(5);
 await Promise.allof($ring.submit(
   $ring.prep-writev($handle, ($wbuf1, $wbuf2), :data(@data[0]), :link);
   $ring.prep-fsync($handle, 0, :data(@data[1]), :link);
-  $ring.prep-poll-add($handle, POLLIN, :data(@data[2]));
+  $ring.prep-poll-add($handle, POLLIN, :data(@data[2]), :link);
 ));
 react whenever $ring.readv($handle, ($rbuf1, $rbuf2), :data(@data[3])) -> $cqe {
   is $cqe.data, @data[3], "Get val {@data[3]} back from kernel";

@@ -13,12 +13,10 @@ for @test-val -> $val {
 }
 
 my $count = 0;
-
 await Promise.allof(@promises);
-
 for @promises>>.result -> $compl {
   is $compl.data, @test-val[$count++], "Get val {$compl.data} back from kernel";
 }
 
-
+$ring.close;
 done-testing;

@@ -9,6 +9,12 @@ use IO::URing::Socket::Raw :ALL;
 
 my constant LIB = "uring";
 
+sub eventfd(uint32 $initval, int32 $flags) returns int32 is native { ... }
+
+sub eventfd_read(int32 $fd, uint64 $value is rw) returns int32 is native { ... }
+
+sub eventfd_write(int32 $fd, uint64 $value) returns int32 is native { ... }
+
 # linux 5.1
 my constant IORING_SETUP_IOPOLL = 1;     # (1U << 0)
 my constant IORING_SETUP_SQPOLL = 2;     # (1U << 1)
@@ -142,9 +148,9 @@ class io_uring_sqe is repr('CStruct') is rw {
   # }
   has uint16 $.buf_index; #index into fixed buffers, if used
   has uint16 $.personality; #personality to use, if used
-  has uint32 $.pad0;
-  has uint64 $.pad1;
-  has uint64 $.pad2;
+  has uint32 $.pad0 = 0;
+  has uint64 $.pad1 = 0;
+  has uint64 $.pad2 = 0;
 
   multi method addr2() { self.off }
 
@@ -500,8 +506,7 @@ sub io_uring_prep_recv(io_uring_sqe $sqe, $fd, Pointer[void] $buf, Int $len, Int
 
 sub io_uring_cqe_get_data(io_uring_cqe $cqe --> Pointer) { Pointer[void].new(+$cqe.user_data) }
 
-# Older versions of the kernel can crash when attempting to use features
-# that are from later versions. Control EXPORT to prevent that.
+
 sub EXPORT() {
   my %constants = %(
     'IORING_SETUP_IOPOLL' => IORING_SETUP_IOPOLL,
@@ -604,6 +609,9 @@ sub EXPORT() {
     '&io_uring_prep_connect' => &io_uring_prep_connect,
     '&io_uring_prep_send' => &io_uring_prep_send,
     '&io_uring_prep_recv' => &io_uring_prep_recv,
+    '&eventfd' => &eventfd,
+    '&eventfd_read' => &eventfd_read,
+    '&eventfd_write' => &eventfd_write,
   );
   my %base = %(|%constants, |%types, |%subs, |%export-types);
   %base<%IO_URING_RAW_EXPORT> = %(|%constants, |%export-types);

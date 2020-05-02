@@ -22,10 +22,10 @@ my @promises = $ring.submit(
   $ring.prep-fsync($handle, 0, :$data, :link),
   $ring.prep-readv($handle, ($rbuf1, $rbuf2), :$data)
 );
-my $read = await @promises[0];
+my $write = await @promises[0];
 my $sync = await @promises[1];
-my $cqe = await @promises[2];
-is $cqe.data, $data, "Get val {$cqe.data} back from kernel";
+my $read = await @promises[2];
+is $read.data, $data, "Get val {$read.data} back from kernel";
 is $rbuf1.decode ~ $rbuf2.decode, $val, "Get temp data back from file";
 
 $handle.close;
