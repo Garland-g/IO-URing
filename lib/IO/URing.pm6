@@ -32,7 +32,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   my $close-promise;
   my $close-vow;
-  has io_uring $!ring .= new;
+  has $!ring = io_uring.new;
   has int $.entries;
   has int32 $!eventfd;
   has io_uring_params $!params .= new;
@@ -163,15 +163,14 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
         }
       }
       io_uring_queue_exit($!ring);
-      $!ring = io_uring;
+      $!ring = Failure.new("Tried to use a closed IO::URing");
       $close-vow.keep(True);
     }
   }
 
-  method close(\SELF: --> Nil) {
+  method close() {
     eventfd_write($!eventfd, $!entries + 1);
     await $close-promise;
-    SELF = Nil;
   }
 
   method features() {

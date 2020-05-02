@@ -615,7 +615,6 @@ class msghdr is repr('CStruct') is rw is export(:msghdr) {
   submethod BUILD(size_t :$iovlen = 1) {
     $!msg_iov := CArray[size_t].new(0 xx (2 * $iovlen));
     $!msg_iovlen = $iovlen;
-    $!msg_controllen = 0;
   }
 
   multi method prep-send(Addrinfo $info, @msg where Str ~~ any(*), Str $name? = Str, :$enc = 'utf-8') {
