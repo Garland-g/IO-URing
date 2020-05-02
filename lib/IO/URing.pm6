@@ -191,6 +191,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $flags +|= IOSQE_IO_LINK if $link;
     $flags +|= IOSQE_IO_DRAIN if $drain;
     $flags +|= IOSQE_IO_HARDLINK if $hard-link;
+    $flags +|= IOSQE_ASYNC if $force-async;
     $flags;
   }
 
