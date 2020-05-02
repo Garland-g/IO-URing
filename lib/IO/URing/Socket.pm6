@@ -9,6 +9,7 @@ use Constants::Netinet::In :ALL;
 role IO::URing::Socket is export {
   has $!socket;
   has int $!dgram;
+  has $!datagram;
   has $.enc;
   has $!encoder;
   has $!close-promise;
@@ -49,15 +50,18 @@ role IO::URing::Socket is export {
     has $!dgram;
     has $!datagram;
     has $!buf;
+    has $!domain;
 
-    method new(sockfd :$socket!, :$scheduler!, IO::URing :$ring!, :$close-promise!, :$dgram!, :$datagram!) {
-      self.CREATE!SET-SELF($socket, $ring, $scheduler, $close-promise, $dgram, $datagram)
+    method new(sockfd :$socket!, :$scheduler!, IO::URing :$ring!, :$close-promise!, :$dgram!, :$datagram!, :$domain!) {
+      self.CREATE!SET-SELF($socket, $ring, $scheduler, $close-promise, $dgram, $datagram, $domain)
     }
 
-    method !SET-SELF(sockfd $!socket, $!ring, $!scheduler, $!close-promise, $!dgram, $!datagram) { self }
+    method !SET-SELF(sockfd $!socket, $!ring, $!scheduler, $!close-promise, $!dgram, $!datagram, $!domain) { self }
 
     method tap(&emit, &done, &quit, &tap) {
       my $buffer := buf8.allocate(1024 * 60, 0); # Size of largest UDP packet
+      my $sockaddr; # Size of largest sockaddr
+      $sockaddr := buf8.allocate(nativesizeof(sockaddr_un)) if $!dgram;
       my int $buffer-start-seq = 0;
       my int $done-target = -1;
       my int $finished = 0;
@@ -66,20 +70,41 @@ role IO::URing::Socket is export {
       my $tap;
       my $handle;
       my $cancellation;
+      my int $count = 0;
       $lock.protect: {
-        # UDP
-        if $!dgram {
-        }
-        else {
-          #TCP
-          $cancellation := $!scheduler.cue: -> {
+        $cancellation := $!scheduler.cue: -> {
+          if $!dgram {
+            # UDP
+            loop {
+              await $handle = $!ring.recvfrom($!socket, $buffer, 0, $sockaddr).then: -> $cmp {
+                $lock.protect: {
+                  unless $finished {
+                    if $cmp ~~ Exception {
+                      quit(X::AdHoc.new(payload => strerror($cmp)));
+                      $finished = 1;
+                    }
+                    elsif $cmp.result.result > 0 {
+                      my \bytes = $cmp.result.result;
+                      Any ~~ $!datagram
+                        ?? emit($buffer.subbuf(^bytes))
+                        !! emit($!datagram.new(:data($buffer.subbuf(^bytes)), :$sockaddr));
+                    }
+                    else {
+                    }
+                  }
+                }
+              };
+            }
+          }
+          else {
+            #TCP
             loop {
               $handle = $!ring.recv($!socket, $buffer);
               await $handle.then: -> $cmp {
                 $lock.protect: {
                   unless $finished {
                     if $cmp ~~ Exception {
-                      quit(x::AdHoc.new(strerror($cmp)));
+                      quit(x::AdHoc.new(payload => strerror($cmp)));
                       $finished = 1;
                     }
                     else {
@@ -118,12 +143,13 @@ role IO::URing::Socket is export {
   }
 
   multi method Supply(IO::URing::Socket:D: :$bin, :$datagram, :$enc = 'utf-8', :$scheduler = $*SCHEDULER) {
+    my $dgram = $datagram ?? $!datagram !! Any;
     if $bin {
       Supply.new: SocketReaderTappable.new:
-        :$!socket, :$!ring, :$scheduler, :$!close-promise, :$!dgram, :$datagram
+        :$!socket, :$!ring, :$scheduler, :$!close-promise, :$!dgram, :datagram($dgram), :$!domain;
     }
     else {
-      my $bin-supply = self.Supply(:bin, :$datagram);
+      my $bin-supply = self.Supply(:bin, :$datagram, :$!domain);
       if $!dgram {
         supply {
           whenever $bin-supply {
@@ -140,6 +166,7 @@ role IO::URing::Socket is export {
   method close(IO::URing::Socket:D: --> True) {
     shutdown($!socket, 2) unless $!dgram;
     close($!socket);
+    $!ring.close;
     try $!close-vow.keep(True);
   }
 
