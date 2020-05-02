@@ -219,6 +219,7 @@ size(--> Int)
 =end pod
 
 class sockaddr_in is repr('CStruct') is export is rw {
+  my constant OFFSET = nativesizeof(int16) + nativesizeof(uint16);
   also does sockaddr_role;
   has int16 $.family;
   has uint16 $.port;
@@ -230,9 +231,8 @@ class sockaddr_in is repr('CStruct') is export is rw {
   submethod TWEAK(:$addr, :$port) {
     memset(nativecast(Pointer[void], self), 0, nativesizeof(self));
     my $temp = in_addr.new(:$addr);
-    my \offset = BEGIN { nativesizeof(int16) + nativesizeof(uint16) };
     memcpy(
-      Pointer[void].new( offset + nativecast(Pointer[void], self)),
+      Pointer[void].new( OFFSET + nativecast(Pointer[void], self)),
       nativecast(Pointer[void], $temp),
       nativesizeof($temp)
     );
@@ -295,6 +295,7 @@ size(--> Int)
 =end pod
 
 class sockaddr_in6 is repr('CStruct') is export {
+  my constant OFFSET =  nativesizeof(int16) + nativesizeof(uint16) + nativesizeof(uint32);
   also does sockaddr_role;
   has int16 $.family;
   has uint16 $.port;
@@ -309,9 +310,8 @@ class sockaddr_in6 is repr('CStruct') is export {
     $!flowinfo = htonl($flowinfo);
     $!scope-id = htonl($scope-id);
     my $temp = in6_addr.new(:addr($addr));
-    my \offset = BEGIN { nativesizeof(int16) + nativesizeof(uint16) + nativesizeof(uint32) };
     memcpy(
-      Pointer[void].new(offset + nativecast(Pointer[void], self)),
+      Pointer[void].new(OFFSET + nativecast(Pointer[void], self)),
       nativecast(Pointer[void], $temp),
       nativesizeof($temp)
     );
