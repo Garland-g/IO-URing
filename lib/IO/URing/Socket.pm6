@@ -1,6 +1,8 @@
 use IO::URing;
 use IO::URing::Socket::Raw :ALL;
 use Universal::errno;
+use Net::IP :ip-get-version;
+$Net::IP::DEBUG = False;
 use NativeCall;
 
 use Constants::Sys::Socket :ALL;
@@ -170,6 +172,23 @@ role IO::URing::Socket is export {
     try $!close-vow.keep(True);
   }
 
+  method connect(IO::URing::Socket:U: Str $host, $port?, |c) {
+    with $port {
+      my $version = ip-get-version $host;
+      if $version == 4 {
+        require ::("IO::URing::Socket::INET");
+        return ::("IO::URing::Socket::INET").connect($host, $port, |c);
+      }
+      elsif $version == 6 {
+        require ::("IO::URing::Socket::INET");
+        return ::("IO::URing::Socket::INET").connect($host, $port, :ip6, |c);
+      }
+    }
+    else {
+      #IO::URing::Socket::UNIX.connect($host, |c);
+    }
+  }
+
   method native-descriptor(--> Int) {
     $!socket;
   }
@@ -179,6 +198,23 @@ role IO::URing::Socket is export {
     my $p := Promise.new;
     nqp::bindattr(socket, IO::URing::Socket, '$!close-promise', $p);
     nqp::bindattr(socket, IO::URing::Socket, '$!close-vow', $p.vow);
+  }
+
+  method listen(IO::URing::Socket:U: Str $host, $port?, |c) {
+    with $port {
+      my $version = ip-get-version $host;
+      if $version == 4 {
+        require ::("IO::URing::Socket::INET");
+        ::("IO::URing::Socket::INET").listen($host, $port, |c);
+      }
+      elsif $version == 6 {
+        require ::("IO::URing::Socket::INET");
+        ::("IO::URing::Socket::INET").listen($host, $port, :ip6, |c);
+      }
+    }
+    else {
+      #URing::Socket::UNIX.listen($host, |c);
+    }
   }
 
 #################################################
