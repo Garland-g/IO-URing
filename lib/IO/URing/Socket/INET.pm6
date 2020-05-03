@@ -4,7 +4,7 @@ use IO::URing::Socket::Raw :ALL;
 use Universal::errno;
 use NativeCall;
 use Constants::Sys::Socket :ALL;
-use Constants::Netinet::In;
+use Constants::Netinet::In :ALL;
 use nqp;
 
 class IO::URing::Socket::INET does IO::URing::Socket is export {
