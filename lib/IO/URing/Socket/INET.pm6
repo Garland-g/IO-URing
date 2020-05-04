@@ -395,6 +395,21 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     $opt.read-uint32(0).Bool;
   }
 
+  multi method set-sending-interface(IO::URing::Socket::INET:D: Str $multi-addr, Str $address, $ifindex = 0) returns Bool {
+    my $ip-mreqn = ip_mreqn.new(:$multi-addr, :$address, :$ifindex);
+    self.set-sending-interface($ip-mreqn);
+  }
+
+  multi method set-sending-interface(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool) {
+    setsockopt(
+      $!socket,
+      $!ipproto,
+      $!domain ~~ AF::INET ?? IP::MULTICAST_IF !! IPV6::MULTICAST_IF,
+      nativecast(Pointer[void], $ip-mreqn),
+      nativesizeof($ip-mreqn)
+    ).Bool;
+  }
+
   multi method ttl(IO::URing::Socket::INET:D: Int $ttl --> Bool) {
     my buf8 $opt .= new;
     $opt.write-int32(0, $ttl);
