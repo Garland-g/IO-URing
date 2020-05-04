@@ -80,6 +80,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     my $io-uring = $ring // IO::URing.new(:4entries);
     my $encoding = Encoding::Registry.find($enc);
     my $domain = $ip6 ?? AF::INET6 !! AF::INET;
+    my $ipproto = $ip6 ?? IPPROTO::IPV6 !! IPPROTO::IP;
     my $socket = socket($domain, SOCK::STREAM, 0);
     my $addr = $domain ~~ AF::INET6
       ?? sockaddr_in6.new($address, $port)
@@ -92,6 +93,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!enc', $encoding.name);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!encoder', $encoding.encoder());
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!domain', $domain);
+      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ipproto', $ipproto);
       setup-close($client_socket);
       $v.keep($client_socket);
     };
@@ -341,8 +343,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   multi method add-ip-membership(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool) {
     setsockopt(
       $!socket,
-      IPPROTO::IP,
-      IP::ADD_MEMBERSHIP,
+      $!ipproto,
+      $!domain ~~ AF::INET ?? IP::ADD_MEMBERSHIP !! IPV6::ADD_MEMBERSHIP,
       nativecast(Pointer[void], $ip-mreqn),
       nativesizeof(ip_mreqn)
     );
@@ -355,8 +357,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   multi method drop-ip-membership(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool) {
     setsockopt(
       $!socket,
-      IPPROTO::IP,
-      IP::DROP_MEMBERSHIP,
+      $!ipproto,
+      $!domain ~~ AF::INET ?? IP::DROP_MEMBERSHIP !! IPV6::DROP_MEMBERSHIP,
       nativecast(Pointer[void], $ip-mreqn),
       nativesizeof(ip_mreqn)
     );
@@ -371,8 +373,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     $opt.write-uint8(0, $loopback ?? 1 !! 0);
     setsockopt(
       $!socket,
-      IPPROTO::IP,
-      IP::MULTICAST_LOOP,
+      $!ipproto,
+      $!domain ~~ AF::INET ?? IP::MULTICAST_LOOP !! IPV6::MULTICAST_LOOP,
       nativecast(Pointer[void], $opt),
       nativesizeof(uint8)
     );
@@ -385,8 +387,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     $len.write-uint32(0, nativesizeof(uint32));
     getsockopt(
       $!socket,
-      IPPROTO::IP,
-      IP::MULTICAST_LOOP,
+      $!ipproto,
+      $!domain ~~ AF::INET ?? IP::MULTICAST_LOOP !! IPV6::MULTICAST_LOOP,
       nativecast(Pointer[void], $opt),
       nativecast(Pointer[uint32], $len)
     );
@@ -398,8 +400,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     $opt.write-int32(0, $ttl);
     setsockopt(
       $!socket,
-      IPPROTO::IP,
-      IP::TTL,
+      $!ipproto,
+      $!domain ~~ AF::INET ?? IP::TTL !! IPV6::UNICAST_HOPS,
       nativecast(Pointer[void], $opt),
       nativesizeof(int32)
     );
@@ -412,35 +414,35 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     $len.write-uint32(0, nativesizeof(uint32));
     getsockopt(
       $!socket,
-      IPPROTO::IP,
-      IP::TTL,
+      $!ipproto,
+      $!domain ~~ AF::INET ?? IP::TTL !! IPV6::UNICAST_HOPS,
       nativecast(Pointer[void], $opt),
       nativecast(Pointer[uint32], $len)
     );
     $opt.read-int32(0);
   }
 
-  multi method multicast-ttl(IO::URing::Socket::INET:D: Int $ttl --> Bool) {
+  multi method multicast-hops(IO::URing::Socket::INET:D: Int $ttl --> Bool) {
     my buf8 $opt .= new;
     $opt.write-int32(0, $ttl);
     setsockopt(
       $!socket,
-      IPPROTO::IP,
-      IP::MULTICAST_TTL,
+      $!ipproto,
+      $!domain ~~ AF::INET ?? IP::MULTICAST_TTL !! IPV6::MULTICAST_HOPS,
       nativecast(Pointer[void], $opt),
       nativesizeof(int32)
     );
   }
 
-  multi method multicast-ttl(IO::URing::Socket::INET:D: --> Int) {
+  multi method multicast-hops(IO::URing::Socket::INET:D: --> Int) {
     my buf8 $opt .= new;
     $opt.write-int32(0, 0);
     my buf8 $len .= new;
     $len.write-uint32(0, nativesizeof(uint32));
     getsockopt(
       $!socket,
-      IPPROTO::IP,
-      IP::MULTICAST_TTL,
+      $!ipproto,
+      $!domain ~~ AF::INET ?? IP::MULTICAST_TTL !! IPV6::MULTICAST_HOPS,
       nativecast(Pointer[void], $opt),
       nativecast(Pointer[uint32], $len)
     );

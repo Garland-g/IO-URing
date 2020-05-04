@@ -18,6 +18,7 @@ role IO::URing::Socket is export {
   has $!close-vow;
   has $!ring;
   has $!domain;
+  has $!ipproto;
 
   method new() {
     die "Cannot directly instantiate an IO::URing::Socket. Please use\n" ~
