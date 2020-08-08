@@ -438,14 +438,9 @@ class ip_mreqn is repr('CStruct') is export(:ip_mreqn) {
   HAS in_addr $.imr-multiaddr; # IP multicast address of group
   HAS in_addr $.imr-address; # IP multicast address of interface
   has int32   $.imr-ifindex;   # Interface index
-  submethod TWEAK(:$multi-addr, :$address, Int :$ifindex = 0) {
-    # Workaround for putting one CStruct into another CStruct repr {
-    my $temp = in_addr.new(:addr($multi-addr));
-    memcpy(nativecast(Pointer[void], self), nativecast(Pointer[void], $temp), nativesizeof($temp));
-    $temp = in_addr.new(:addr($address));
-    memcpy(Pointer[void].new(nativesizeof($temp) + nativecast(Pointer[void], self)), nativecast(Pointer[void], $temp), nativesizeof($temp));
-    # }
-
+  submethod BUILD(:$multi-addr, :$address, Int :$ifindex = 0) {
+    $!imr-multiaddr := in_addr.new(:addr($multi-addr));
+    $!imr-address := in_addr.new(:addr($address));
     $!imr-ifindex = $ifindex;
   }
   method size() returns size_t {
@@ -473,10 +468,8 @@ class ipv6_mreq is repr('CStruct') is export(:ipv6_mreq) {
   HAS in6_addr $.ipv6mr-multiaddr;
   has uint32 $.ipv6mr-interface;
 
-  submethod TWEAK(Str :$multi-addr, Int :$ifindex = 0) {
-    my $temp = in6_addr.new(:addr($multi-addr));
-    memcpy(nativecast(Pointer[void], self), nativecast(Pointer[void], $temp), nativesizeof($temp));
-
+  submethod BUILD(Str :$multi-addr, Int :$ifindex = 0) {
+    $!ipv6mr-multiaddr := in6_addr.new(:addr($multi-addr));
     $!ipv6mr-interface = $ifindex;
   }
 }
