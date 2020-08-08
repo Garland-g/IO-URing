@@ -221,25 +221,14 @@ size(--> Int)
 class sockaddr_in is repr('CStruct') is export is rw {
   my constant OFFSET = nativesizeof(int16) + nativesizeof(uint16);
   also does sockaddr_role;
-  has int16 $.family;
+  has int16 $.family = AF::INET;
   has uint16 $.port;
   HAS in_addr $.addr;
   has uint64 $!zero = 0;
 
-  submethod BUILD(:$addr, :$port) {}
-
-  submethod TWEAK(:$addr, :$port) {
-    memset(nativecast(Pointer[void], self), 0, nativesizeof(self));
-    my $temp = in_addr.new(:$addr);
-    memcpy(
-      Pointer[void].new( OFFSET + nativecast(Pointer[void], self)),
-      nativecast(Pointer[void], $temp),
-      nativesizeof($temp)
-    );
-    $!family = AF::INET;
-    $!port = htons($port);
-    my $blob = blob8.allocate(nativesizeof(self), 0);
-    memcpy(nativecast(Pointer[void], $blob), nativecast(Pointer[void], self), nativesizeof(self));
+  submethod BUILD(:$addr, :$port) {
+      $!addr := in_addr.new(:$addr);
+      $!port = htons($port);
   }
 
   multi method new(Str :$addr, Port :$port) {
@@ -297,25 +286,17 @@ size(--> Int)
 class sockaddr_in6 is repr('CStruct') is export {
   my constant OFFSET =  nativesizeof(int16) + nativesizeof(uint16) + nativesizeof(uint32);
   also does sockaddr_role;
-  has int16 $.family;
+  has int16 $.family = AF::INET6;
   has uint16 $.port;
   has uint32 $.flowinfo;
   HAS in6_addr $.addr;
   has uint32 $.scope-id;
 
-  submethod BUILD(:$port, :$flowinfo, :$addr, :$scope-id) {}
-
-  submethod TWEAK(:$port, :$flowinfo, :$addr, :$scope-id) {
-    $!port = htons($port);
-    $!flowinfo = htonl($flowinfo);
-    $!scope-id = htonl($scope-id);
-    my $temp = in6_addr.new(:addr($addr));
-    memcpy(
-      Pointer[void].new(OFFSET + nativecast(Pointer[void], self)),
-      nativecast(Pointer[void], $temp),
-      nativesizeof($temp)
-    );
-    $!family = AF::INET6;
+  submethod BUILD(:$port, :$flowinfo, :$addr, :$scope-id) {
+      $!port = htons($port);
+      $!flowinfo = htonl($flowinfo);
+      $!scope-id = htonl($scope-id);
+      $!addr := in6_addr.new(:$addr);
   }
 
   multi method new(Str :$addr, Port :$port, :$flowinfo = 0, :$scope-id = 0) {
@@ -325,7 +306,6 @@ class sockaddr_in6 is repr('CStruct') is export {
   multi method new(Str $addr, Port $port) {
     self.new(:$addr, :$port)
   }
-
 
   method flowinfo(sockaddr_in6:D: --> uint32) {
     ntohl: $!flowinfo
