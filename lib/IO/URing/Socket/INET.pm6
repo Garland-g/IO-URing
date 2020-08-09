@@ -74,7 +74,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   }
 
   method connect(IO::URing::Socket::INET:U: Str $address, Int $port where IO::Socket::Async::Port-Number, :$ip6,
-                :$enc = 'utf-8', IO::URing :$ring = IO::URing.new(:128entries)) {
+                :$enc = 'utf-8', IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $p = Promise.new;
     my $v = $p.vow;
     my $encoding = Encoding::Registry.find($enc);
@@ -246,14 +246,14 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
 
   method listen(IO::URing::Socket::INET:U: Str $host, Int $port where IO::Socket::Async::Port-Number,
                 Int() $backlog = 128, :$ip6, :REUSEADDR(:$reuseaddr), :REUSEPORT(:$reuseport),
-                :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing :$ring = IO::URing.new(:128entries)) {
+                :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $domain = $ip6 ?? AF::INET6 !! AF::INET;
     my $encoding = Encoding::Registry.find($enc);
     Supply.new: SocketListenerTappable.new:
       :$host, :$port, :$ring, :$backlog, :$encoding, :$scheduler, :$domain :$reuseport, :$reuseaddr
   }
 
-  method dgram(IO::URing::Socket::INET:U: :$broadcast, :$ip6, :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing :$ring = IO::URing.new(:128entries)) {
+  method dgram(IO::URing::Socket::INET:U: :$broadcast, :$ip6, :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $p = Promise.new;
     $scheduler.cue: -> {
       my $domain = $ip6 ?? AF::INET6 !! AF::INET;
@@ -280,7 +280,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   }
 
   method bind-dgram(IO::URing::Socket::INET:U: Str() $host, Int() $port where IO::Socket::Async::Port-Number, :$ip6,
-                   :REUSEADDR(:$reuseaddr), :REUSEPORT(:$reuseport), :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing :$ring = IO::URing.new(:128entries)) {
+                   :REUSEADDR(:$reuseaddr), :REUSEPORT(:$reuseport), :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $p = Promise.new;
     $scheduler.cue: -> {
       my $domain = $ip6 ?? AF::INET6 !! AF::INET;
