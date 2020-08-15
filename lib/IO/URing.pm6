@@ -279,7 +279,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     my $pos = 0;
     my @iovecs;
     for @bufs -> $buf {
-      my iovec $iov .= new($buf);
+      my IOVec $iov .= new($buf);
       $iovecs[$pos] = +$iov.Pointer;
       $iovecs[$pos + 1] = $iov.elems;
       @iovecs.push($iov);
@@ -329,7 +329,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     my @iovecs;
     my $pos = 0;
     for @bufs -> $buf {
-      my iovec $iov .= new($buf);
+      my IOVec $iov .= new($buf);
       $iovecs[$pos] = +$iov.Pointer;
       $iovecs[$pos + 1] = $iov.elems;
       @iovecs.push($iov);

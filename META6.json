@@ -5,6 +5,7 @@
   ],
   "build-depends" : [ ],
   "depends" : [
+    "NativeHelpers::iovec",
     "Universal::errno"
    ],
   "description" : "Access the io_uring interface from Raku",

@@ -1,5 +1,6 @@
 use NativeCall;
 use NativeHelpers::Blob;
+use NativeHelpers::iovec;
 use Constants::Sys::Socket :AF, :SOCK;
 
 subset Port of Int where 0 <= * <= 65535;
@@ -480,51 +481,38 @@ sub memcpy(Pointer[void], Pointer[void], size_t) returns Pointer[void] is native
 
 sub malloc(size_t $size) returns Pointer[void] is native is export { ... }
 
-class iovec is repr('CStruct') is rw {
-  has Pointer[void] $.iov_base;
-  has size_t $.iov_len;
+class IOVec {
+  has iovec $.iov handles <elems Pointer>;
+  has $.storage;
 
-  submethod BUILD(Pointer:D :$iov_base, Int:D :$iov_len) {
-    $!iov_base := $iov_base;
-    $!iov_len = $iov_len;
+  submethod TWEAK(Blob :$storage) {
+    # VM-specific behavior:
+    # If MoarVM, use fast-path for bufs storage.
+    # Otherwise, use slow path.
+    if $*VM.name eq 'moar' {
+      $!storage = $storage;
+      $!iov .= new(nativecast(Pointer[void], $storage), $!storage.bytes);
+    }
+    else {
+      $!iov .= new($storage);
+    }
   }
 
-  method free(iovec:D:) {
-    free(nativecast(Pointer[void], self));
-  }
-
-  multi method new(Str $str --> iovec) {
-    self.new($str.encode);
-  }
-
-  multi method new(Blob $blob --> iovec) {
-    my $ptr = malloc($blob.bytes);
-    memcpy($ptr, nativecast(Pointer[void], $blob), $blob.bytes);
-    self.bless(:iov_base($ptr), :iov_len($blob.bytes));
-  }
-
-  multi method new(CArray[size_t] $arr, UInt $pos) {
-    self.bless(:iov_base($arr[$pos]), :iov_len($arr[$pos + 1]));
-  }
-
-  multi method new(size_t :$ptr, size_t :$len) {
-    self.bless(:iov_base($ptr), :iov_len($len))
+  method new(Blob:D $storage --> IOVec) {
+    self.bless(:$storage);
   }
 
   method Blob {
-    my buf8 $buf .= allocate($!iov_len);
-    memcpy(nativecast(Pointer[void], $buf), $!iov_base, $!iov_len);
-    $buf;
+    return $!storage // $!iov.Blob;
   }
 
-  method elems {
-    $!iov_len
-  }
-
-  method Pointer {
-    $!iov_base;
+  method free {
+    unless $*VM.name eq 'moar' {
+      $!iov.free;
+    }
   }
 }
+
 
 enum AddrInfo-Flags (
         AI_PASSIVE                  => 0x0001;

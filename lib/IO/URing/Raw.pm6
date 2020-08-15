@@ -4,6 +4,7 @@ die "Must be loaded on Linux 5.1 or higher"
   unless $*KERNEL ~~ 'linux' && $version ~~ v5.1+;
 
 use NativeCall;
+use NativeHelpers::iovec;
 use IO::URing::Socket::Raw :ALL;
 #use Universal::errno;
 
@@ -578,9 +579,6 @@ sub EXPORT() {
     'POLLHUP' => POLLHUP,
     'POLLNVAL' => POLLNVAL,
   );
-  my %types = %(
-    'iovec' => iovec,
-  );
   my %export-types = %(
     'io_uring' => io_uring,
     'io_uring_cqe' => io_uring_cqe,
@@ -613,7 +611,7 @@ sub EXPORT() {
     '&eventfd_read' => &eventfd_read,
     '&eventfd_write' => &eventfd_write,
   );
-  my %base = %(|%constants, |%types, |%subs, |%export-types);
+  my %base = %(|%constants, |%subs, |%export-types);
   %base<%IO_URING_RAW_EXPORT> = %(|%constants, |%export-types);
   %base;
 }
