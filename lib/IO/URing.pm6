@@ -39,6 +39,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   has Lock::Async $!storage-lock .= new;
   has %!storage is default(STORAGE::EMPTY);
   has Channel $!queue .= new;
+  has %!supported-ops;
 
   submethod TWEAK(UInt :$!entries!, UInt :$flags = tweak-flags, Int :$cq-size) {
     $close-promise = Promise.new;
@@ -654,6 +655,21 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.submit(self.prep-recv($fd, $buf, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
+  multi method supported-ops(IO::URing:D: --> Hash) {
+    return %!supported-ops // do {
+      my $probe = io_uring_get_probe_ring($!ring);
+      %!supported-ops = $probe.supported-ops();
+      $probe.free;
+      %!supported-ops;
+    }
+  }
+
+  multi method supported-ops(IO::URing:U: --> Hash) {
+    my $probe = io_uring_get_probe();
+    my %supported-ops = $probe.supported-ops();
+    $probe.free;
+    return %supported-ops;
+  }
 }
 
 sub EXPORT() {

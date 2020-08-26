@@ -58,46 +58,59 @@ my constant IOSQE_IO_LINK_BIT = 2;
 my constant IOSQE_IO_HARDLINK_BIT = 3;
 my constant IOSQE_ASYNC_BIT = 4;
 
+enum IORING_OP (
 # linux 5.1
-my constant IORING_OP_NOP = 0;
-my constant IORING_OP_READV = 1;
-my constant IORING_OP_WRITEV = 2;
-my constant IORING_OP_FSYNC = 3;
-my constant IORING_OP_READ_FIXED = 4;
-my constant IORING_OP_WRITE_FIXED = 5;
-my constant IORING_OP_POLL_ADD = 6;
-my constant IORING_OP_POLL_REMOVE = 7;
+  "IORING_OP_NOP",
+  "IORING_OP_READV",
+  "IORING_OP_WRITEV",
+  "IORING_OP_FSYNC",
+  "IORING_OP_READ_FIXED",
+  "IORING_OP_WRITE_FIXED",
+  "IORING_OP_POLL_ADD",
+  "IORING_OP_POLL_REMOVE",
 # linux 5.2
-my constant IORING_OP_SYNC_FILE_RANGE = 8;
+  "IORING_OP_SYNC_FILE_RANGE",
 # linux 5.3
-my constant IORING_OP_SENDMSG = 9;
-my constant IORING_OP_RECVMSG = 10;
+  "IORING_OP_SENDMSG",
+  "IORING_OP_RECVMSG",
 # linux 5.4
-my constant IORING_OP_TIMEOUT = 11;
+  "IORING_OP_TIMEOUT",
 # linux 5.5
-my constant IORING_OP_TIMEOUT_REMOVE = 12;
-my constant IORING_OP_ACCEPT = 13;
-my constant IORING_OP_ASYNC_CANCEL = 14;
-my constant IORING_OP_LINK_TIMEOUT = 15;
-my constant IORING_OP_CONNECT = 16;
+  "IORING_OP_TIMEOUT_REMOVE",
+  "IORING_OP_ACCEPT",
+  "IORING_OP_ASYNC_CANCEL",
+  "IORING_OP_LINK_TIMEOUT",
+  "IORING_OP_CONNECT",
 # linux 5.6
-my constant IORING_OP_FALLOCATE = 17;
-my constant IORING_OP_OPENAT = 18;
-my constant IORING_OP_CLOSE = 19;
-my constant IORING_OP_FILES_UPDATE = 20;
-my constant IORING_OP_STATX = 21;
-my constant IORING_OP_READ = 22;
-my constant IORING_OP_WRITE = 23;
-my constant IORING_OP_FADVISE = 24;
-my constant IORING_OP_MADVISE = 25;
-my constant IORING_OP_SEND = 26;
-my constant IORING_OP_RECV = 27;
-my constant IORING_OP_OPENAT2 = 28;
-my constant IORING_OP_EPOLL_CTL = 29;
+  "IORING_OP_FALLOCATE",
+  "IORING_OP_OPENAT",
+  "IORING_OP_CLOSE",
+  "IORING_OP_FILES_UPDATE",
+  "IORING_OP_STATX",
+  "IORING_OP_READ",
+  "IORING_OP_WRITE",
+  "IORING_OP_FADVISE",
+  "IORING_OP_MADVISE",
+  "IORING_OP_SEND",
+  "IORING_OP_RECV",
+  "IORING_OP_OPENAT2",
+  "IORING_OP_EPOLL_CTL",
+#linux 5.7
+  "IORING_OP_SPLICE",
+  "IORING_OP_PROVIDE_BUFFERS",
+  "IORING_OP_REMOVE_BUFFERS",
+#linux 5.9
+  "IORING_OP_TEE",
 # end
+  "IORING_OP_LAST",
+);
+
 
 my constant IORING_ENTER_GETEVENTS = 1;
 my constant IORING_ENTER_SQ_WAKEUP = 2;
+
+# linux 5.6
+my constant IO_URING_OP_SUPPORTED = 1; # (1U << 0)
 
 class kernel_timespec is repr('CStruct') is rw {
   has uint64 $tv_sec;
@@ -113,6 +126,42 @@ class sigset_t is repr('CPointer') {
   }
   my sub sigemptyset(sigset_t) returns int32 is native { ... }
   my sub sigfillset(sigset_t) returns int32 is native { ... }
+}
+
+class io_uring_probe_op is repr('CStruct') {
+  has uint8 $.op;
+  has uint8 $.resv;
+  has uint16 $.flags;
+  has uint32 $.resv2;
+}
+
+class io_uring_probe is repr('CStruct') {
+  has uint8 $.last-op;
+  has uint8 $.ops-len;
+  has uint16 $.resv;
+  HAS uint32 @.resv2[3] is CArray;
+
+  method supported-ops(--> Hash) {
+    my %ops;
+    my $ptr = Pointer[int64].new(nativesizeof(self) + nativecast(Pointer[int64], self));
+
+    my sub parse-probe-op(io_uring_probe_op $probe-op --> Bool) {
+      return ($probe-op.flags +& IO_URING_OP_SUPPORTED).Bool;
+    }
+
+    for ^$!last-op -> $opcode {
+      my $name = IORING_OP($opcode);
+      last if $name == IORING_OP_LAST;
+      %ops{IORING_OP($name)} = parse-probe-op(nativecast(io_uring_probe_op, $ptr));
+      $ptr = Pointer[int64].new(8 + $ptr);
+    }
+    return %ops;
+  }
+
+  method free(\SELF: --> Nil) {
+    free(nativecast(Pointer, SELF));
+    SELF = Nil;
+  }
 }
 
 class io_uring_sqe is repr('CStruct') is rw {
@@ -306,9 +355,6 @@ my constant IORING_REGISTER_EVENTFD_ASYNC = 7;
 my constant IORING_REGISTER_PROBE = 8;
 my constant IORING_REGISTER_PERSONALITY = 9;
 my constant IORING_UNREGISTER_PERSONALITY = 10;
-
-#linux 5.6
-my constant IO_URING_OP_SUPPORTED = 1; # 1U << 0
 
 sub _io_uring_queue_init_params(uint32 $entries, io_uring, io_uring_params) returns int32 is native(LIB) is symbol('io_uring_queue_init_params') { ... }
 
@@ -507,6 +553,9 @@ sub io_uring_prep_recv(io_uring_sqe $sqe, $fd, Pointer[void] $buf, Int $len, Int
 
 sub io_uring_cqe_get_data(io_uring_cqe $cqe --> Pointer) { Pointer[void].new(+$cqe.user_data) }
 
+sub io_uring_get_probe_ring(io_uring --> io_uring_probe) is native(LIB) { ... }
+
+sub io_uring_get_probe( --> io_uring_probe) is native(LIB) { ... }
 
 sub EXPORT() {
   my %constants = %(
@@ -518,36 +567,7 @@ sub EXPORT() {
     'IORING_SETUP_ATTACH_WQ' => IORING_SETUP_ATTACH_WQ,
     'IORING_FSYNC_DATASYNC' => IORING_FSYNC_DATASYNC,
     'IORING_SQ_NEED_WAKEUP' => IORING_SQ_NEED_WAKEUP,
-    'IORING_OP_NOP' => IORING_OP_NOP,
-    'IORING_OP_READV' => IORING_OP_READV,
-    'IORING_OP_WRITEV' => IORING_OP_WRITEV,
-    'IORING_OP_FSYNC' => IORING_OP_FSYNC,
-    'IORING_OP_READ_FIXED' => IORING_OP_READ_FIXED,
-    'IORING_OP_WRITE_FIXED' => IORING_OP_WRITE_FIXED,
-    'IORING_OP_POLL_ADD' => IORING_OP_POLL_ADD,
-    'IORING_OP_POLL_REMOVE' => IORING_OP_POLL_REMOVE,
-    'IORING_OP_TIMEOUT' => IORING_OP_TIMEOUT,
-    'IORING_OP_SYNC_FILE_RANGE' => IORING_OP_SYNC_FILE_RANGE,
-    'IORING_OP_SENDMSG' => IORING_OP_SENDMSG,
-    'IORING_OP_RECVMSG' => IORING_OP_RECVMSG,
-    'IORING_OP_TIMEOUT_REMOVE' => IORING_OP_TIMEOUT_REMOVE,
-    'IORING_OP_ACCEPT' => IORING_OP_ACCEPT,
-    'IORING_OP_ASYNC_CANCEL' => IORING_OP_ASYNC_CANCEL,
-    'IORING_OP_LINK_TIMEOUT' => IORING_OP_LINK_TIMEOUT,
-    'IORING_OP_CONNECT' => IORING_OP_CONNECT,
-    'IORING_OP_FALLOCATE' => IORING_OP_FALLOCATE,
-    'IORING_OP_OPENAT' => IORING_OP_OPENAT,
-    'IORING_OP_CLOSE' => IORING_OP_CLOSE,
-    'IORING_OP_FILES_UPDATE' => IORING_OP_FILES_UPDATE,
-    'IORING_OP_STATX' => IORING_OP_STATX,
-    'IORING_OP_READ' => IORING_OP_READ,
-    'IORING_OP_WRITE' => IORING_OP_WRITE,
-    'IORING_OP_FADVISE' => IORING_OP_FADVISE,
-    'IORING_OP_MADVISE' => IORING_OP_MADVISE,
-    'IORING_OP_SEND' => IORING_OP_SEND,
-    'IORING_OP_RECV' => IORING_OP_RECV,
-    'IORING_OP_OPENAT2' => IORING_OP_OPENAT2,
-    'IORING_OP_EPOLL_CTL' => IORING_OP_EPOLL_CTL,
+    'IORING_OP' => IORING_OP,
     'IOSQE_IO_DRAIN' => IOSQE_IO_DRAIN,
     'IOSQE_IO_LINK' => IOSQE_IO_LINK,
     'IOSQE_IO_HARDLINK' => IOSQE_IO_HARDLINK,
@@ -607,6 +627,8 @@ sub EXPORT() {
     '&io_uring_prep_connect' => &io_uring_prep_connect,
     '&io_uring_prep_send' => &io_uring_prep_send,
     '&io_uring_prep_recv' => &io_uring_prep_recv,
+    '&io_uring_get_probe_ring' => &io_uring_get_probe_ring,
+    '&io_uring_get_probe' => &io_uring_get_probe,
     '&eventfd' => &eventfd,
     '&eventfd_read' => &eventfd_read,
     '&eventfd_write' => &eventfd_write,
