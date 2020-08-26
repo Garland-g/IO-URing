@@ -213,6 +213,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
                 nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!encoder',
                         $!encoding.encoder());
                 nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!domain', AF::INET);
+                nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!acceptable', 0);
                 setup-close($client_socket);
                 emit($client_socket);
               }
