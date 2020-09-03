@@ -427,6 +427,13 @@ sub io_uring_peek_batch_cqe(io_uring, Pointer[io_uring_cqe] is rw, uint32) retur
 #  io_uring_wait_cqes($ring, $sqe, $ts, $set);
 #}
 
+sub __io_uring_get_cqe(io_uring, Pointer[io_uring_cqe] is rw, uint32, uint32, Pointer) returns int32
+  is native(LIB) { ... }
+
+sub io_uring_wait_cqe_nr(io_uring \ring, Pointer[io_uring_cqe] \cqe-ptr is rw, uint32 \wait-nr) returns int32 {
+  return __io_uring_get_cqe(ring, cqe-ptr, 0, wait-nr, Pointer);
+}
+
 sub _io_uring_wait_cqe_timeout(io_uring, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32
   is native(LIB) is symbol('io_uring_wait_cqe_timeout') { ... }
 
@@ -595,9 +602,11 @@ sub EXPORT() {
     '&io_uring_get_sqe' => &io_uring_get_sqe,
     '&io_uring_cqe_seen' => &io_uring_cqe_seen,
     '&io_uring_submit' => &io_uring_submit,
+    '&io_uring_submit_and_wait' => &io_uring_submit_and_wait,
     '&io_uring_peek_batch_cqe' => &io_uring_peek_batch_cqe,
     '&io_uring_wait_cqe_timeout' => &io_uring_wait_cqe_timeout,
     '&io_uring_wait_cqe' => &io_uring_wait_cqe,
+    '&io_uring_wait_cqe_nr' => &io_uring_wait_cqe_nr,
     '&io_uring_prep_nop' => &io_uring_prep_nop,
     '&io_uring_prep_readv' => &io_uring_prep_readv,
     '&io_uring_prep_writev' => &io_uring_prep_writev,
