@@ -442,7 +442,7 @@ sub io_uring_wait_cqe_timeout(|c) returns int32 {
 sub _io_uring_get_sqe(io_uring) returns io_uring_sqe is native(LIB) is symbol('io_uring_get_sqe') { ... }
 
 sub io_uring_get_sqe(io_uring $ring) returns io_uring_sqe {
-  my $sqe = _io_uring_get_sqe($ring);
+  my $sqe := _io_uring_get_sqe($ring);
   $sqe.defined ?? $sqe !! Failure.new("Submission ring is out of room");
 }
 
