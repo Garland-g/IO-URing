@@ -10,6 +10,14 @@ use IO::URing::Socket::Raw :ALL;
 
 my constant LIB = "uring";
 
+# specified by iBCS2
+my constant POLLIN =   0x0001;
+my constant POLLPRI =  0x0002;
+my constant POLLOUT =  0x0004;
+my constant POLLERR =  0x0008;
+my constant POLLHUP =  0x0010;
+my constant POLLNVAL = 0x0020;
+
 sub eventfd(uint32 $initval, int32 $flags) returns int32 is native { ... }
 
 sub eventfd_read(int32 $fd, uint64 $value is rw) returns int32 is native { ... }
@@ -501,14 +509,6 @@ sub io_uring_prep_fsync(io_uring_sqe $sqe, $fd, UInt $fsync_flags --> Nil) {
   io_uring_prep_rw(IORING_OP_FSYNC, $sqe, $fd, Str, 0, 0);
   $sqe.union-flags = $fsync_flags +& 0xFFFFFFFF;
 }
-
-# specified by iBCS2
-my constant POLLIN =   0x0001;
-my constant POLLPRI =  0x0002;
-my constant POLLOUT =  0x0004;
-my constant POLLERR =  0x0008;
-my constant POLLHUP =  0x0010;
-my constant POLLNVAL = 0x0020;
 
 sub io_uring_prep_poll_add(io_uring_sqe $sqe, $fd, Int $poll_mask --> Nil) {
   io_uring_prep_rw(IORING_OP_POLL_ADD, $sqe, $fd, Str, 0, 0);
