@@ -254,6 +254,93 @@ class io_uring_sqe is repr('CStruct') is rw {
   method fadvise_advice {
     return self.union-flags;
   }
+
+  method prep(Int \op, Int \fd, $addr, Int \len, Int \offset) {
+    self.opcode = op;
+    self.flags = 0;
+    self.ioprio = 0;
+    self.fd = fd;
+    self.off = offset;
+    self.addr = $addr.defined ?? +$addr !! 0;
+    self.len = len;
+    self.rw_flags: 0;
+    self.user_data = 0;
+    self.pad0 = self.pad1 = self.pad2 = 0;
+  }
+
+  method prep-nop() {
+    self.prep(IORING_OP_NOP, -1, Pointer, 0, 0);
+    self
+  }
+
+  method prep-readv($fd, Pointer[size_t] $iovecs, UInt $nr_vecs, Int $offset) {
+    self.prep(IORING_OP_READV, $fd, $iovecs, $nr_vecs, $offset);
+    self
+  }
+
+  method prep-writev($fd, Pointer[size_t] $iovecs, UInt $nr_vecs, Int $offset) {
+    self.prep(IORING_OP_WRITEV, $fd, $iovecs, $nr_vecs, $offset);
+    self
+  }
+
+  method prep-fsync($fd, UInt $fsync-flags) {
+    self.prep(IORING_OP_FSYNC, $fd, Str, 0, 0);
+    $!union-flags = $fsync-flags +& 0xFFFFFFFF;
+    self
+  }
+
+  method prep-poll-add($fd, Int $poll-mask) {
+    self.prep(IORING_OP_POLL_ADD, $fd, Str, 0, 0);
+    $!union-flags = $poll-mask +& 0xFFFF;
+    self
+  }
+
+  method prep-poll-remove(Int $user-data) {
+    self.prep(IORING_OP_POLL_REMOVE, -1, $user-data, 0, 0);
+    self
+  }
+
+  method prep-recvmsg($fd, Pointer $msg, uint32 $flags) {
+    self.prep(IORING_OP_RECVMSG, $fd, $msg, 1, 0);
+    $!union-flags = $flags;
+    self
+  }
+
+  method prep-sendmsg($fd, Pointer $msg, uint32 $flags) {
+    self.prep(IORING_OP_SENDMSG, $fd, $msg, 1, 0);
+    $!union-flags = $flags;
+    self
+  }
+
+  method prep-cancel(UInt $flags, Int $user-data) {
+    self.prep(IORING_OP_ASYNC_CANCEL, -1, $user-data, 0, 0);
+    $!union-flags = $flags;
+  }
+
+  method prep-accept($fd, $flags, $addr = Any) {
+    my $size = $addr.defined ?? $addr.size !! 0;
+    my $address = $addr.defined ?? nativecast(Pointer, $addr) !! Str;
+    self.prep(IORING_OP_ACCEPT, $fd, $address, 0, $size);
+    $!union-flags = $flags;
+    self
+  }
+
+  method prep-connect($fd, sockaddr() $addr) {
+    self.prep(IORING_OP_CONNECT, $fd, nativecast(Pointer, $addr), 0, $addr.size);
+    self
+  }
+
+  method prep-send($fd, Pointer[void] $buf, Int $len, Int $flags) {
+    self.prep(IORING_OP_SEND, $fd, $buf, $len, 0);
+    $!union-flags = $flags;
+    self
+  }
+
+  method prep-recv($fd, Pointer[void] $buf, Int $len, Int $flags) {
+    self.prep(IORING_OP_RECV, $fd, $buf, $len, 0);
+    $!union-flags = $flags;
+    self
+  }
 }
 
 class io_uring_cqe is repr('CStruct') is rw {
