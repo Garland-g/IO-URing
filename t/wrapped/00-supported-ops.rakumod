@@ -13,6 +13,6 @@ ok %supported-ops<IORING_OP_NOP>, <Supports OP_NOP>;
 
 nok %supported-ops<IORING_OP_LAST>, <No entry for OP_LAST>;
 
-ok %supported-ops<IORING_OP_SPLICE>, <Entry for OP_TEE exists>;
+ok %supported-ops<IORING_OP_EPOLL_CTL>, <Entry for OP_TEE exists>;
 
 done-testing;

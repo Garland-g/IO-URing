@@ -3,12 +3,10 @@ use Test;
 use IO::URing::Raw;
 use NativeCall;
 
-my io_uring $ring .= new;
+my io_uring $ring .= new(:2entries);
 
 # Random values to prove that no cheating is happening
 my @test-val = (^1000).pick(3);
-
-io_uring_queue_init(2, $ring, 0);
 
 for @test-val -> $test {
 
