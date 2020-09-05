@@ -6,7 +6,7 @@ die "Must be loaded on Linux 5.1 or higher"
 use NativeCall;
 use NativeHelpers::iovec;
 use IO::URing::Socket::Raw :ALL;
-#use Universal::errno;
+use Universal::errno;
 
 my constant LIB = "uring";
 
@@ -177,6 +177,54 @@ class io_uring_probe is repr('CStruct') {
     SELF = Nil;
   }
 }
+
+class io_sqring_offsets is repr('CStruct') {
+  has uint32 $.head;
+  has uint32 $.tail;
+  has uint32 $.ring_mask;
+  has uint32 $.ring_entries;
+  has uint32 $.flags;
+  has uint32 $.dropped;
+  has uint32 $.array;
+  has uint32 $.resv1;
+  has uint64 $.resv2;
+}
+
+class io_cqring_offsets is repr('CStruct') {
+  has uint32 $.head;
+  has uint32 $.tail;
+  has uint32 $.ring_mask;
+  has uint32 $.ring_entries;
+  has uint32 $.overflow;
+  has uint32 $.cqes;
+  has uint64 $.resv1;
+  has uint64 $.resv2;
+}
+
+class io_uring_params is repr('CStruct') {
+  has uint32 $.sq_entries;
+  has uint32 $.cq_entries is rw;
+  has uint32 $.flags is rw;
+  has uint32 $.sq_thread_cpu;
+  has uint32 $.sq_thread_idle;
+  has uint32 $.features;
+  has uint32 $.wq_fd;
+  has uint32 $.resv0;
+  has uint32 $.resv1;
+  has uint32 $.resv2;
+  HAS io_sqring_offsets $.sq_off;
+  HAS io_cqring_offsets $.cq_off;
+}
+
+# io_uring_params features flags
+enum IORING_FEAT (
+  SINGLE_MMAP => 1,      #5.4  1U << 0
+  NODROP => 2,           #5.5  1U << 1
+  SUBMIT_STABLE => 4,    #5.5  1U << 2
+  RW_CUR_POS => 8,       #5.6  1U << 3
+  CUR_PERSONALITY => 16, #5.6  1U << 4
+  FAST_POLL => 32,       #5.7  1U << 5
+);
 
 class io_uring_sqe is repr('CStruct') is rw {
   has uint8 $.opcode;   # type of operation
@@ -386,59 +434,52 @@ class io_uring is repr('CStruct') {
   HAS io_uring_cq $.cq;
   has uint32 $.flags;
   has int32 $.ring_fd;
-  submethod TWEAK() {
+  submethod TWEAK(:$entries!, :$flags, :$params) {
     $!sq := io_uring_sq.new;
     $!cq := io_uring_cq.new;
+    if $params.defined {
+      io_uring_queue_init_params($entries, self, $params);
+    }
+    else {
+      io_uring_queue_init($entries, self, $flags);
+    }
+  }
+
+  multi method new(UInt :$entries = 128, :$flags = 0, io_uring_params :$params) {
+    self.bless(:$entries, :$flags, :$params);
+  }
+
+  method submit {
+    io_uring_submit(self);
+  }
+
+  method submit-and-wait(uint32 $wait_nr) {
+    io_uring_submit_and_wait(self, $wait_nr);
+  }
+
+  method wait {
+    my Pointer[io_uring_cqe] $ptr .= new;
+    my \ret = io_uring_wait_cqe(self, $ptr);
+    if ret < 0 {
+      my $failure = fail errno.symbol;
+      set_errno(0);
+      return $failure;
+    }
+    return $ptr;
+  }
+
+  method arm($eventfd) {
+    my $sqe := io_uring_get_sqe(self);
+    without $sqe {
+      # If people are batching to the limit...
+      io_uring_submit(self);
+      $sqe := io_uring_get_sqe(self);
+    }
+    io_uring_prep_poll_add($sqe, $eventfd, POLLIN);
+    $sqe.user_data = 0;
+    self.submit-and-wait(1);
   }
 }
-
-class io_sqring_offsets is repr('CStruct') {
-  has uint32 $.head;
-  has uint32 $.tail;
-  has uint32 $.ring_mask;
-  has uint32 $.ring_entries;
-  has uint32 $.flags;
-  has uint32 $.dropped;
-  has uint32 $.array;
-  has uint32 $.resv1;
-  has uint64 $.resv2;
-}
-
-class io_cqring_offsets is repr('CStruct') {
-  has uint32 $.head;
-  has uint32 $.tail;
-  has uint32 $.ring_mask;
-  has uint32 $.ring_entries;
-  has uint32 $.overflow;
-  has uint32 $.cqes;
-  has uint64 $.resv1;
-  has uint64 $.resv2;
-}
-
-class io_uring_params is repr('CStruct') {
-  has uint32 $.sq_entries;
-  has uint32 $.cq_entries is rw;
-  has uint32 $.flags is rw;
-  has uint32 $.sq_thread_cpu;
-  has uint32 $.sq_thread_idle;
-  has uint32 $.features;
-  has uint32 $.wq_fd;
-  has uint32 $.resv0;
-  has uint32 $.resv1;
-  has uint32 $.resv2;
-  HAS io_sqring_offsets $.sq_off;
-  HAS io_cqring_offsets $.cq_off;
-}
-
-# io_uring_params features flags
-enum IORING_FEAT (
-  SINGLE_MMAP => 1,      #5.4  1U << 0
-  NODROP => 2,           #5.5  1U << 1
-  SUBMIT_STABLE => 4,    #5.5  1U << 2
-  RW_CUR_POS => 8,       #5.6  1U << 3
-  CUR_PERSONALITY => 16, #5.6  1U << 4
-  FAST_POLL => 32,       #5.7  1U << 5
-);
 
 # io_uring_register opcodes and arguments
 enum IORING_REGISTER (

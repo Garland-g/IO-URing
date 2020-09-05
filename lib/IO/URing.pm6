@@ -32,7 +32,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   my $close-promise;
   my $close-vow;
-  has $!ring = io_uring.new;
+  has $!ring;
   has int $.entries;
   has int32 $!eventfd;
   has io_uring_params $!params .= new;
@@ -47,12 +47,12 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $!params.flags = $flags;
     if $cq-size.defined && $cq-size >= $!entries {
       given log2($cq-size) {
-        $cq-size = 2^($_ + 1) unless $_ ~~ Int;
+        $cq-size = 2 ** ($_ + 1) unless $_ ~~ Int;
       }
       $!params.flags +|= IORING_SETUP_CQSIZE;
       $!params.cq_entries = $cq-size;
     }
-    my $result = io_uring_queue_init_params($!entries, $!ring, $!params);
+    $!ring = io_uring.new(:$!entries, :$!params);
     $!eventfd = eventfd(1, 0);
     start {
         self!arm();
