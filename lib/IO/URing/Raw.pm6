@@ -264,46 +264,46 @@ class io_uring_sqe is repr('CStruct') is rw {
   has uint64 $.pad1 = 0;
   has uint64 $.pad2 = 0;
 
-  multi method addr2() { self.off }
+  multi method addr2(io_uring_sqe:D: ) { self.off }
 
-  multi method rw_flags() {
+  multi method rw_flags(io_uring_sqe:D: ) {
     nativecast(int32, self.union-flags);
   }
-  multi method rw_flags(Int $flags) {
+  multi method rw_flags(io_uring_sqe:D: Int $flags) {
     self.union-flags = $flags;
   }
-  method fsync_flags() {
+  method fsync_flags(io_uring_sqe:D: ) {
     return self.union-flags;
   }
-  method poll_events() {
+  method poll_events(io_uring_sqe:D: ) {
     return self.union-flags +& 0x0000FFFF;
   }
-  method sync_range_flags {
+  method sync_range_flags(io_uring_sqe:D: ) {
     return self.union-flags;
   }
-  method msg_flags {
+  method msg_flags(io_uring_sqe:D: ) {
     return self.union-flags;
   }
-  method timeout_flags {
+  method timeout_flags(io_uring_sqe:D: ) {
     return self.union-flags;
   }
-  method accept_flags {
+  method accept_flags(io_uring_sqe:D: ) {
     return self.union-flags;
   }
-  method cancel_flags {
+  method cancel_flags(io_uring_sqe:D: ) {
     return self.union-flags;
   }
-  method open_flags {
+  method open_flags(io_uring_sqe:D: ) {
     return self.union-flags;
   }
-  method statx_flags {
+  method statx_flags(io_uring_sqe:D: ) {
     return self.union-flags;
   }
-  method fadvise_advice {
+  method fadvise_advice(io_uring_sqe:D: ) {
     return self.union-flags;
   }
 
-  method prep(Int \op, Int \fd, $addr, Int \len, Int \offset) {
+  method prep(io_uring_sqe:D: Int \op, Int \fd, $addr, Int \len, Int \offset) {
     self.opcode = op;
     self.flags = 0;
     self.ioprio = 0;
@@ -316,56 +316,56 @@ class io_uring_sqe is repr('CStruct') is rw {
     self.pad0 = self.pad1 = self.pad2 = 0;
   }
 
-  method prep-nop() {
+  method prep-nop(io_uring_sqe:D: ) {
     self.prep(IORING_OP_NOP, -1, Pointer, 0, 0);
     self
   }
 
-  method prep-readv($fd, Pointer[size_t] $iovecs, UInt $nr_vecs, Int $offset) {
+  method prep-readv(io_uring_sqe:D: $fd,  $iovecs, UInt $nr_vecs, Int $offset) {
     self.prep(IORING_OP_READV, $fd, $iovecs, $nr_vecs, $offset);
     self
   }
 
-  method prep-writev($fd, Pointer[size_t] $iovecs, UInt $nr_vecs, Int $offset) {
+  method prep-writev(io_uring_sqe:D: $fd,  $iovecs, UInt $nr_vecs, Int $offset) {
     self.prep(IORING_OP_WRITEV, $fd, $iovecs, $nr_vecs, $offset);
     self
   }
 
-  method prep-fsync($fd, UInt $fsync-flags) {
+  method prep-fsync(io_uring_sqe:D: $fd, UInt $fsync-flags) {
     self.prep(IORING_OP_FSYNC, $fd, Str, 0, 0);
     $!union-flags = $fsync-flags +& 0xFFFFFFFF;
     self
   }
 
-  method prep-poll-add($fd, Int $poll-mask) {
+  method prep-poll-add(io_uring_sqe:D: $fd, Int $poll-mask) {
     self.prep(IORING_OP_POLL_ADD, $fd, Str, 0, 0);
     $!union-flags = $poll-mask +& 0xFFFF;
     self
   }
 
-  method prep-poll-remove(Int $user-data) {
+  method prep-poll-remove(io_uring_sqe:D: Int $user-data) {
     self.prep(IORING_OP_POLL_REMOVE, -1, $user-data, 0, 0);
     self
   }
 
-  method prep-recvmsg($fd, Pointer $msg, uint32 $flags) {
+  method prep-recvmsg(io_uring_sqe:D: $fd, Pointer $msg, uint32 $flags) {
     self.prep(IORING_OP_RECVMSG, $fd, $msg, 1, 0);
     $!union-flags = $flags;
     self
   }
 
-  method prep-sendmsg($fd, Pointer $msg, uint32 $flags) {
+  method prep-sendmsg(io_uring_sqe:D: $fd, Pointer $msg, uint32 $flags) {
     self.prep(IORING_OP_SENDMSG, $fd, $msg, 1, 0);
     $!union-flags = $flags;
     self
   }
 
-  method prep-cancel(UInt $flags, Int $user-data) {
+  method prep-cancel(io_uring_sqe:D: UInt $flags, Int $user-data) {
     self.prep(IORING_OP_ASYNC_CANCEL, -1, $user-data, 0, 0);
     $!union-flags = $flags;
   }
 
-  method prep-accept($fd, $flags, $addr = Any) {
+  method prep-accept(io_uring_sqe:D: $fd, $flags, $addr = Any) {
     my $size = $addr.defined ?? $addr.size !! 0;
     my $address = $addr.defined ?? nativecast(Pointer, $addr) !! Str;
     self.prep(IORING_OP_ACCEPT, $fd, $address, 0, $size);
@@ -373,18 +373,18 @@ class io_uring_sqe is repr('CStruct') is rw {
     self
   }
 
-  method prep-connect($fd, sockaddr() $addr) {
+  method prep-connect(io_uring_sqe:D: $fd, sockaddr() $addr) {
     self.prep(IORING_OP_CONNECT, $fd, nativecast(Pointer, $addr), 0, $addr.size);
     self
   }
 
-  method prep-send($fd, Pointer[void] $buf, Int $len, Int $flags) {
+  method prep-send(io_uring_sqe:D: $fd, Pointer[void] $buf, Int $len, Int $flags) {
     self.prep(IORING_OP_SEND, $fd, $buf, $len, 0);
     $!union-flags = $flags;
     self
   }
 
-  method prep-recv($fd, Pointer[void] $buf, Int $len, Int $flags) {
+  method prep-recv(io_uring_sqe:D: $fd, Pointer[void] $buf, Int $len, Int $flags) {
     self.prep(IORING_OP_RECV, $fd, $buf, $len, 0);
     $!union-flags = $flags;
     self
@@ -445,19 +445,24 @@ class io_uring is repr('CStruct') {
     }
   }
 
-  multi method new(UInt :$entries = 128, :$flags = 0, io_uring_params :$params) {
+  multi method new(io_uring:U: UInt :$entries = 128, :$flags = 0, io_uring_params :$params) {
     self.bless(:$entries, :$flags, :$params);
   }
 
-  method submit {
+  method close(\SELF: ) {
+    io_uring_queue_exit(SELF);
+    SELF = io_uring;
+  }
+
+  method submit(io_uring:D: ) {
     io_uring_submit(self);
   }
 
-  method submit-and-wait(uint32 $wait_nr) {
+  method submit-and-wait(io_uring:D: uint32 $wait_nr) {
     io_uring_submit_and_wait(self, $wait_nr);
   }
 
-  method wait {
+  method wait(io_uring:D: ) {
     my Pointer[io_uring_cqe] $ptr .= new;
     my \ret = io_uring_wait_cqe(self, $ptr);
     if ret < 0 {
@@ -468,7 +473,7 @@ class io_uring is repr('CStruct') {
     return $ptr;
   }
 
-  method arm($eventfd) {
+  method arm(io_uring:D: $eventfd) {
     my $sqe := io_uring_get_sqe(self);
     without $sqe {
       # If people are batching to the limit...
@@ -500,11 +505,11 @@ enum IORING_REGISTER (
   IORING_UNREGISTER_PERSONALITY => 10,
 );
 
-sub _io_uring_queue_init_params(uint32 $entries, io_uring, io_uring_params) returns int32 is native(LIB) is symbol('io_uring_queue_init_params') { ... }
+sub _io_uring_queue_init_params(uint32 $entries, io_uring:D, io_uring_params:D) returns int32 is native(LIB) is symbol('io_uring_queue_init_params') { ... }
 
-sub io_uring_queue_init_params(UInt $entries, io_uring $ring, io_uring_params $params) returns int32 {
+sub io_uring_queue_init_params(UInt $entries, io_uring:D $ring, io_uring_params:D $params) returns int32 {
   my uint32 $entries-u32 = $entries;
-  my int32 $result = _io_uring_queue_init_params($entries-u32, $ring, $params);;
+  my int32 $result = _io_uring_queue_init_params($entries-u32, $ring, $params);
   return $result < 0
   ?? do {
     fail "ring setup failed";
@@ -512,7 +517,7 @@ sub io_uring_queue_init_params(UInt $entries, io_uring $ring, io_uring_params $p
   !! $result;
 }
 
-sub io_uring_queue_init(UInt $entries, io_uring $ring, UInt $flags) returns int32 {
+sub io_uring_queue_init(UInt $entries, io_uring:D $ring, UInt $flags) returns int32 {
   my uint32 $entries-u32 = $entries;
   my uint32 $flags-u32 = $flags;
   my int32 $result = _io_uring_queue_init($entries-u32, $ring, $flags-u32);
@@ -523,13 +528,13 @@ sub io_uring_queue_init(UInt $entries, io_uring $ring, UInt $flags) returns int3
   !! $result;
 }
 
-sub _io_uring_queue_init(uint32 $entries, io_uring, uint32 $flags) returns int32
+sub _io_uring_queue_init(uint32 $entries, io_uring:D, uint32 $flags) returns int32
   is native(LIB) is symbol('io_uring_queue_init') { ... }
 
-#sub io_uring_queue_mmap(int32 $fd, io_uring_params, io_uring) is native(LIB) { ... }
+#sub io_uring_queue_mmap(int32 $fd, io_uring_params:D, io_uring:D) is native(LIB) { ... }
 
-#sub io_uring_ring_dontfork(io_uring) is native(LIB) { ... }
-sub io_uring_queue_exit(io_uring) is native(LIB) { ... }
+#sub io_uring_ring_dontfork(io_uring:D) is native(LIB) { ... }
+sub io_uring_queue_exit(io_uring:D) is native(LIB) { ... }
 
 sub io_uring_submit(|c) returns int32 {
   my int32 $result = _io_uring_submit(|c);
@@ -540,9 +545,9 @@ sub io_uring_submit(|c) returns int32 {
   !! $result
 }
 
-sub _io_uring_submit(io_uring --> int32) is native(LIB) is symbol('io_uring_submit') { ... }
+sub _io_uring_submit(io_uring:D --> int32) is native(LIB) is symbol('io_uring_submit') { ... }
 
-sub _io_uring_submit_and_wait(io_uring, uint32 $wait_nr) is native(LIB) is symbol('io_uring_submit_and_wait') { ... }
+sub _io_uring_submit_and_wait(io_uring:D, uint32 $wait_nr) is native(LIB) returns int32 is symbol('io_uring_submit_and_wait') { ... }
 
 sub io_uring_submit_and_wait(|c) {
   my int32 $result = _io_uring_submit_and_wait(|c);
@@ -553,24 +558,24 @@ sub io_uring_submit_and_wait(|c) {
   !! $result
 }
 
-sub io_uring_peek_batch_cqe(io_uring, Pointer[io_uring_cqe] is rw, uint32) returns uint32 is native(LIB) { ... }
+sub io_uring_peek_batch_cqe(io_uring:D, Pointer[io_uring_cqe] is rw, uint32) returns uint32 is native(LIB) { ... }
 
-#multi sub io_uring_wait_cqes(io_uring, io_uring_cqe is rw, kernel_timespec, sigset_t --> int32) is native(LIB) { ... }
+#multi sub io_uring_wait_cqes(io_uring:D, io_uring_cqe is rw, kernel_timespec, sigset_t --> int32) is native(LIB) { ... }
 
-#multi sub io_uring_wait_cqes(io_uring $ring, io_uring_cqe $sqe is rw, kernel_timespec $ts --> int32) {
+#multi sub io_uring_wait_cqes(io_uring:D $ring, io_uring_cqe $sqe is rw, kernel_timespec $ts --> int32) {
 #  my sigset_t $set .= new;
 #  $set.fill;
 #  io_uring_wait_cqes($ring, $sqe, $ts, $set);
 #}
 
-sub __io_uring_get_cqe(io_uring, Pointer[io_uring_cqe] is rw, uint32, uint32, Pointer) returns int32
+sub __io_uring_get_cqe(io_uring:D, Pointer[io_uring_cqe] is rw, uint32, uint32, Pointer) returns int32
   is native(LIB) { ... }
 
-sub io_uring_wait_cqe_nr(io_uring \ring, Pointer[io_uring_cqe] $cqe-ptr is rw, uint32 \wait-nr) returns int32 {
+sub io_uring_wait_cqe_nr(io_uring:D \ring, Pointer[io_uring_cqe] $cqe-ptr is rw, uint32 \wait-nr) returns int32 {
   return __io_uring_get_cqe(ring, $cqe-ptr, 0, wait-nr, Pointer);
 }
 
-sub _io_uring_wait_cqe_timeout(io_uring, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32
+sub _io_uring_wait_cqe_timeout(io_uring:D, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32
   is native(LIB) is symbol('io_uring_wait_cqe_timeout') { ... }
 
 sub io_uring_wait_cqe_timeout(|c) returns int32 {
@@ -582,9 +587,9 @@ sub io_uring_wait_cqe_timeout(|c) returns int32 {
   !! $result
 }
 
-sub _io_uring_get_sqe(io_uring) returns io_uring_sqe is native(LIB) is symbol('io_uring_get_sqe') { ... }
+sub _io_uring_get_sqe(io_uring:D) returns io_uring_sqe is native(LIB) is symbol('io_uring_get_sqe') { ... }
 
-sub io_uring_get_sqe(io_uring $ring) returns io_uring_sqe {
+sub io_uring_get_sqe(io_uring:D $ring) returns io_uring_sqe {
   my $sqe := _io_uring_get_sqe($ring);
   $sqe.defined ?? $sqe !! Failure.new("Submission ring is out of room");
 }
@@ -595,7 +600,7 @@ sub io_uring_wait_cqe(|c) {
 
 sub io_uring_cqe_seen(io_uring $ring, io_uring_cqe $cqe) is native(%?RESOURCES<libraries/uringraku>) is symbol('io_uring_cqe_seen_wrapper') { ... }
 
-sub io_uring_prep_rw(Int \op, io_uring_sqe $sqe, Int \fd, $addr, Int \len, Int \offset) {
+sub io_uring_prep_rw(Int \op, io_uring_sqe:D $sqe, Int \fd, $addr, Int \len, Int \offset) {
   $sqe.opcode = op;
   $sqe.flags = 0;
   $sqe.ioprio = 0;
@@ -608,69 +613,69 @@ sub io_uring_prep_rw(Int \op, io_uring_sqe $sqe, Int \fd, $addr, Int \len, Int \
   $sqe.pad0 = $sqe.pad1 = $sqe.pad2 = 0;
 }
 
-sub io_uring_prep_nop(io_uring_sqe $sqe --> Nil) {
+sub io_uring_prep_nop(io_uring_sqe:D $sqe --> Nil) {
   io_uring_prep_rw(IORING_OP_NOP, $sqe, -1, Pointer, 0, 0);
 }
 
-sub io_uring_prep_readv(io_uring_sqe $sqe, $fd, Pointer[size_t] $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
+sub io_uring_prep_readv(io_uring_sqe:D $sqe, $fd, Pointer $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
   io_uring_prep_rw(IORING_OP_READV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
 }
 
-sub io_uring_prep_writev(io_uring_sqe $sqe, $fd, Pointer[size_t] $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
+sub io_uring_prep_writev(io_uring_sqe:D $sqe, $fd, Pointer $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
   io_uring_prep_rw(IORING_OP_WRITEV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
 }
 
-sub io_uring_prep_fsync(io_uring_sqe $sqe, $fd, UInt $fsync_flags --> Nil) {
+sub io_uring_prep_fsync(io_uring_sqe:D $sqe, $fd, UInt $fsync_flags --> Nil) {
   io_uring_prep_rw(IORING_OP_FSYNC, $sqe, $fd, Str, 0, 0);
   $sqe.union-flags = $fsync_flags +& 0xFFFFFFFF;
 }
 
-sub io_uring_prep_poll_add(io_uring_sqe $sqe, $fd, Int $poll_mask --> Nil) {
+sub io_uring_prep_poll_add(io_uring_sqe:D $sqe, $fd, Int $poll_mask --> Nil) {
   io_uring_prep_rw(IORING_OP_POLL_ADD, $sqe, $fd, Str, 0, 0);
   $sqe.union-flags = $poll_mask +& 0xFFFF;
 }
 
-sub io_uring_prep_poll_remove(io_uring_sqe $sqe, Int $user_data --> Nil) {
+sub io_uring_prep_poll_remove(io_uring_sqe:D $sqe, Int $user_data --> Nil) {
   io_uring_prep_rw(IORING_OP_POLL_REMOVE, $sqe, -1, $user_data, 0, 0);
 }
 
-sub io_uring_prep_recvmsg(io_uring_sqe $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) {
+sub io_uring_prep_recvmsg(io_uring_sqe:D $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) {
   io_uring_prep_rw(IORING_OP_RECVMSG, $sqe, $fd, $msg, 1, 0);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_sendmsg(io_uring_sqe $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) {
+sub io_uring_prep_sendmsg(io_uring_sqe:D $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) {
   io_uring_prep_rw(IORING_OP_SENDMSG, $sqe, $fd, $msg, 1, 0);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_cancel(io_uring_sqe $sqe, UInt $flags, Int $user_data --> Nil) {
+sub io_uring_prep_cancel(io_uring_sqe:D $sqe, UInt $flags, Int $user_data --> Nil) {
   io_uring_prep_rw(IORING_OP_ASYNC_CANCEL, $sqe, -1, $user_data, 0, 0);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_accept(io_uring_sqe $sqe, $fd, $flags, $addr --> Nil) {
+sub io_uring_prep_accept(io_uring_sqe:D $sqe, $fd, $flags, $addr --> Nil) {
   my $size = $addr.defined ?? $addr.size !! 0;
   my $address = $addr.defined ?? nativecast(Pointer, $addr) !! Str;
   io_uring_prep_rw(IORING_OP_ACCEPT, $sqe, $fd, $address, 0, $size);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_connect(io_uring_sqe $sqe, $fd, sockaddr() $addr --> Nil) {
+sub io_uring_prep_connect(io_uring_sqe:D $sqe, $fd, sockaddr() $addr --> Nil) {
   io_uring_prep_rw(IORING_OP_CONNECT, $sqe, $fd, nativecast(Pointer, $addr), 0, $addr.size);
 }
 
-sub io_uring_prep_send(io_uring_sqe $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) {
+sub io_uring_prep_send(io_uring_sqe:D $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) {
   io_uring_prep_rw(IORING_OP_SEND, $sqe, $fd, $buf, $len, 0);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_recv(io_uring_sqe $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) {
+sub io_uring_prep_recv(io_uring_sqe:D $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) {
   io_uring_prep_rw(IORING_OP_RECV, $sqe, $fd, $buf, $len, 0);
   $sqe.union-flags = $flags;
 }
 
-#multi sub io_uring_register_files(io_uring, Pointer[int32] $files, uint32 $num_files) returns int32 is native(LIB) { ... }
+#multi sub io_uring_register_files(io_uring:D, Pointer[int32] $files, uint32 $num_files) returns int32 is native(LIB) { ... }
 
 #multi sub io_uring_register_files(io_uring $ring, @files where .all.^can("native-descriptor"), uint32 $num_files) returns int32 {
 #  my $arr = CArray[int32].new;
@@ -681,9 +686,9 @@ sub io_uring_prep_recv(io_uring_sqe $sqe, $fd, Pointer[void] $buf, Int $len, Int
 #  io_uring_register_files($ring, nativecast(Pointer[int32], $arr), $count);
 #}
 
-sub io_uring_cqe_get_data(io_uring_cqe $cqe --> Pointer) { Pointer[void].new(+$cqe.user_data) }
+sub io_uring_cqe_get_data(io_uring_cqe:D $cqe --> Pointer) { Pointer[void].new(+$cqe.user_data) }
 
-sub io_uring_get_probe_ring(io_uring --> io_uring_probe) is native(LIB) { ... }
+sub io_uring_get_probe_ring(io_uring:D --> io_uring_probe) is native(LIB) { ... }
 
 sub io_uring_get_probe( --> io_uring_probe) is native(LIB) { ... }
 
