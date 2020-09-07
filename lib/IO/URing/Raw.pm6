@@ -484,6 +484,14 @@ class io_uring is repr('CStruct') {
     $sqe.user_data = 0;
     self.submit-and-wait(1);
   }
+
+  method get-sqe(io_uring:D: ) {
+    io_uring_get_sqe(self);
+  }
+
+  method mark-seen(io_uring:D: io_uring_cqe $seen) {
+    io_uring_cqe_seen(self, $seen);
+  }
 }
 
 # io_uring_register opcodes and arguments
