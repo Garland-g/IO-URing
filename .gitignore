@@ -1,6 +1,6 @@
 /blib/
 /src/*.o
-/src/Makefile
+/src/*.so
 /.panda-work
 /resources/*.so
 /resources/*.dylib

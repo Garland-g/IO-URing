@@ -8,7 +8,7 @@ use NativeHelpers::iovec;
 use IO::URing::Socket::Raw :ALL;
 use Universal::errno;
 
-my constant LIB = "uring";
+constant \LIB = 'uring';
 
 # specified by iBCS2
 my constant POLLIN =   0x0001;
@@ -593,20 +593,7 @@ sub io_uring_wait_cqe(|c) {
   return io_uring_wait_cqe_timeout(|c, kernel_timespec);
 }
 
-sub io_uring_advance(io_uring $ring, uint32 $nr) {
-  if ($nr) {
-    my io_uring_cq $cq = $ring.cq;
-    repeat {
-      my $arr = nativecast(CArray[uint32], $cq.khead);
-      full-barrier();
-      $arr[0] = $cq.khead.deref + $nr;
-    } while (0);
-  }
-}
-
-sub io_uring_cqe_seen(io_uring $ring, io_uring_cqe $cqe) {
-  io_uring_advance($ring, 1) if ($cqe);
-}
+sub io_uring_cqe_seen(io_uring $ring, io_uring_cqe $cqe) is native(%?RESOURCES<libraries/uringraku>) is symbol('io_uring_cqe_seen_wrapper') { ... }
 
 sub io_uring_prep_rw(Int \op, io_uring_sqe $sqe, Int \fd, $addr, Int \len, Int \offset) {
   $sqe.opcode = op;
