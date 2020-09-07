@@ -437,7 +437,7 @@ class io_uring is repr('CStruct') {
   submethod TWEAK(:$entries!, :$flags, :$params) {
     $!sq := io_uring_sq.new;
     $!cq := io_uring_cq.new;
-    if $params.defined {
+    with $params {
       io_uring_queue_init_params($entries, self, $params);
     }
     else {
