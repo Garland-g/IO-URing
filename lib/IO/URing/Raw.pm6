@@ -434,7 +434,7 @@ class io_uring is repr('CStruct') {
   HAS io_uring_cq $.cq;
   has uint32 $.flags;
   has int32 $.ring_fd;
-  submethod TWEAK(:$entries!, :$flags, :$params) {
+  submethod TWEAK(:$entries!, :$flags, :$params, :$allow-fork = False) {
     $!sq := io_uring_sq.new;
     $!cq := io_uring_cq.new;
     with $params {
@@ -443,6 +443,7 @@ class io_uring is repr('CStruct') {
     else {
       io_uring_queue_init($entries, self, $flags);
     }
+    io_uring_ring_dontfork(self) unless $allow-fork;
   }
 
   multi method new(io_uring:U: UInt :$entries = 128, :$flags = 0, io_uring_params :$params) {
@@ -541,7 +542,7 @@ sub _io_uring_queue_init(uint32 $entries, io_uring:D, uint32 $flags) returns int
 
 #sub io_uring_queue_mmap(int32 $fd, io_uring_params:D, io_uring:D) is native(LIB) { ... }
 
-#sub io_uring_ring_dontfork(io_uring:D) is native(LIB) { ... }
+sub io_uring_ring_dontfork(io_uring:D) is native(LIB) { ... }
 sub io_uring_queue_exit(io_uring:D) is native(LIB) { ... }
 
 sub io_uring_submit(|c) returns int32 {
