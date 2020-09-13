@@ -548,8 +548,29 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                           )
   }
 
+  method !prep-cancel(Int $slot, UInt $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+      my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
+      return Submission.new(
+              :sqe(io_uring_sqe.new:
+                      :opcode(IORING_OP_ASYNC_CANCEL),
+                      :$flags,
+                      :ioprio(0),
+                      :fd(-1),
+                      :off(0),
+                      :$union-flags,
+                      :addr($slot)
+                      :len(0),
+              ),
+              :$data
+              )
+  }
+
   method cancel(Handle $slot, UInt :$flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
-    self.submit(self.prep-cancel($slot, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
+      self.submit(self.prep-cancel($slot, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
+  }
+
+  method !cancel(Int $slot, UInt :$flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    self.submit(self!prep-cancel($slot, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
   multi method prep-accept($fd, |c --> Submission) {
