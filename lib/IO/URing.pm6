@@ -30,8 +30,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   my \tweak-flags = IORING_SETUP_CLAMP;
 
-  my $close-promise;
-  my $close-vow;
+  has $!close-promise;
+  has $!close-vow;
   has $!ring;
   has int $.entries;
   has int32 $!eventfd;
@@ -42,8 +42,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   has %!supported-ops;
 
   submethod TWEAK(UInt :$!entries!, UInt :$flags = tweak-flags, Int :$cq-size) {
-    $close-promise = Promise.new;
-    $close-vow = $close-promise.vow;
+    $!close-promise = Promise.new;
+    $!close-vow = $!close-promise.vow;
     $!params.flags = $flags;
     $!entries = 8 if $!entries < 8;
     if $cq-size.defined && $cq-size >= $!entries {
@@ -98,6 +98,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
           die "Got a NULL Pointer from the completion queue";
         }
       }
+        $!close-vow.keep(True);
       CATCH {
         default {
           die $_;
@@ -159,20 +160,23 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   method !close() {
     if $!ring ~~ io_uring:D {
+      my @promises;
       $!storage-lock.protect: {
         for %!storage.keys -> $ptr {
+          @promises.push($!ring!cancel(+$ptr));
           free(Pointer[void].new(+$ptr));
         }
       }
-      io_uring_queue_exit($!ring);
-      $!ring = Failure.new("Tried to use a closed IO::URing");
-      $close-vow.keep(True);
+      ($!ring, my $temp) = (Failure.new("Tried to use a closed IO::URing"), $!ring);
+      await @promises;
+      io_uring_queue_exit($temp);
+      $!close-vow.keep(True);
     }
   }
 
   method close() {
     eventfd_write($!eventfd, $!entries + 1);
-    await $close-promise;
+    await $!close-promise;
   }
 
   method features() {
