@@ -109,11 +109,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   method !arm() {
     # This only runs on the submission thread
-    my $sqe = io_uring_get_sqe($!ring);
+    my $sqe := io_uring_get_sqe($!ring);
     without $sqe {
       # If people are batching to the limit...
       io_uring_submit($!ring);
-      $sqe = io_uring_get_sqe($!ring);
+      $sqe := io_uring_get_sqe($!ring);
     }
     io_uring_prep_poll_add($sqe, $!eventfd, POLLIN);
     $sqe.user_data = 0;
@@ -128,10 +128,10 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       if $!queue.poll -> (:key($v), :value($subs)) {
         @handles = do for @$subs -> Submission $sub {
           my Handle $p .= new;
-          my $sqe = io_uring_get_sqe($!ring);
+          my $sqe := io_uring_get_sqe($!ring);
           without $sqe {
             io_uring_submit($!ring);
-            $sqe = io_uring_get_sqe($!ring);
+            $sqe := io_uring_get_sqe($!ring);
           }
           $p.break(Failure.new("No more room in ring")) unless $sqe.defined;
           memcpy(nativecast(Pointer, $sqe), nativecast(Pointer, $sub.sqe), nativesizeof($sqe));
