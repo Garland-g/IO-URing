@@ -19,7 +19,9 @@
     "IO::URing::Socket::INET" : "lib/IO/URing/Socket/INET.pm6",
     "IO::URing::Socket::Raw" : "lib/IO/URing/Socket/Raw.pm6"
   },
-  "resources" : [ ],
+  "resources" : [
+    "libraries/uringraku"
+  ],
   "source-url" : "",
   "tags" : [ ],
   "test-depends" : [ ],
