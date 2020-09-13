@@ -45,6 +45,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $close-promise = Promise.new;
     $close-vow = $close-promise.vow;
     $!params.flags = $flags;
+    $!entries = 8 if $!entries < 8;
     if $cq-size.defined && $cq-size >= $!entries {
       given log2($cq-size) {
         $cq-size = 2 ** ($_ + 1) unless $_ ~~ Int;
