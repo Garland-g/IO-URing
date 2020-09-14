@@ -167,6 +167,10 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   method !pseudo-op-handler(Submission $sub) {
     io_uring_submit($!ring);
+    if $sub.data ~~ "close-fd" {
+      shutdown($sub.addr, SHUT_RDWR);
+      close($sub.addr);
+    }
   }
 
   method !close() {
@@ -690,6 +694,16 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
 
   multi method recv($fd, Blob $buf, Int $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-recv($fd, $buf, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
+  }
+
+  method close-fd(IO::URing:D: Int $fd --> Handle) {
+    self.submit(
+      Submission.new(
+                      :sqe(io_uring_sqe:U)
+                      :addr($fd),
+                      :data("close-fd"),
+                     )
+    )
   }
 
   multi method supported-ops(IO::URing:D: --> Hash) {
