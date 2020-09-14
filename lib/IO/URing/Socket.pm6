@@ -79,53 +79,50 @@ role IO::URing::Socket is export {
         $cancellation := $!scheduler.cue: -> {
           if $!dgram {
             # UDP
-            loop {
-              await $handle = $!ring.recvfrom($!socket, $buffer, 0, $sockaddr).then: -> $cmp {
-                $lock.protect: {
-                  unless $finished {
-                    if $cmp ~~ Exception {
-                      quit(X::AdHoc.new(payload => strerror($cmp)));
-                      $finished = 1;
-                    }
-                    elsif $cmp.result.result > 0 {
-                      my \bytes = $cmp.result.result;
-                      Any ~~ $!datagram
-                        ?? emit($buffer.subbuf(^bytes))
-                        !! emit($!datagram.new(:data($buffer.subbuf(^bytes)), :$sockaddr));
-                    }
-                    else {
-                    }
+            $handle = $!ring.recvfrom($!socket, $buffer, 0, $sockaddr).then: -> $cmp {
+              $lock.protect: {
+                unless $finished {
+                  if $cmp ~~ Exception {
+                    quit(X::AdHoc.new(payload => strerror($cmp)));
+                    $finished = 1;
+                  }
+                  elsif $cmp.result.result > 0 {
+                    my \bytes = $cmp.result.result;
+                    Any ~~ $!datagram
+                      ?? emit($buffer.subbuf(^bytes))
+                      !! emit($!datagram.new(:data($buffer.subbuf(^bytes)), :$sockaddr));
+                  }
+                  else {
                   }
                 }
-              };
-            }
+              }
+            };
+            await $handle;
           }
           else {
             #TCP
-            loop {
-              $handle = $!ring.recv($!socket, $buffer);
-              await $handle.then: -> $cmp {
-                $lock.protect: {
-                  unless $finished {
-                    if $cmp ~~ Exception {
-                      quit(x::AdHoc.new(payload => strerror($cmp)));
-                      $finished = 1;
+            $handle = $!ring.recv($!socket, $buffer);
+            await $handle.then: -> $cmp {
+              $lock.protect: {
+                unless $finished {
+                  if $cmp ~~ Exception {
+                    quit(x::AdHoc.new(payload => strerror($cmp)));
+                    $finished = 1;
+                  }
+                  else {
+                    my \bytes := $cmp.result.result;
+                    if bytes > 0 {
+                      emit($buffer.subbuf(^bytes));
                     }
                     else {
-                      my \bytes := $cmp.result.result;
-                      if bytes > 0 {
-                        emit($buffer.subbuf(^bytes));
-                      }
-                      else {
-                        $finished = 1;
-                        done();
-                      }
+                      $finished = 1;
+                      done();
                     }
                   }
                 }
               }
-              last if $finished;
             }
+            my $result = await $handle;
           }
         }
         $tap := Tap.new({ $cancellation.cancel(); });
