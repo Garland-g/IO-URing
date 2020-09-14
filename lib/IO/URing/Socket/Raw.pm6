@@ -13,6 +13,12 @@ constant INET_ADDRSTRLEN = 16;
 constant INET6_ADDRSTRLEN = 46;
 constant IFNAMSIZ = 16;
 
+enum SHUT is export(:SHUT) (
+  SHUT_RD => 0,
+  SHUT_WR => 1,
+  SHUT_RDWR => 2,
+);
+
 =begin pod
 
 =head2 Unix::Socket::Raw
