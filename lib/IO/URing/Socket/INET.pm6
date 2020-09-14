@@ -224,8 +224,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
         $tap = ListenSocket.new: {
           my $p = Promise.new;
           my $v = $p.vow;
-          $cancellation.cancel();
-          $v.keep(True);
+          $cancellation.cancel;
+          $!scheduler.cue({ $v.keep(True) });
           $p
         }, :$socket-tobe, :$socket-host, :$socket-port;
         tap($tap);
