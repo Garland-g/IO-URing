@@ -168,8 +168,7 @@ role IO::URing::Socket is export {
   }
 
   method close(IO::URing::Socket:D: --> True) {
-    shutdown($!socket, 0) unless $!dgram;
-    close($!socket);
+    $!ring.close-fd($!socket) unless $!dgram;
     $!ring.close if $!acceptable;
     try $!close-vow.keep(True);
   }
