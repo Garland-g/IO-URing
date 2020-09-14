@@ -2,6 +2,7 @@ use IO::URing;
 use IO::URing::Socket;
 use IO::URing::Socket::Raw :ALL;
 use Universal::errno;
+use Universal::errno::Constants;
 use NativeCall;
 use Constants::Sys::Socket :ALL;
 use Constants::Netinet::In :ALL;
@@ -81,11 +82,11 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     my $domain = $ip6 ?? AF::INET6 !! AF::INET;
     my $ipproto = $ip6 ?? IPPROTO::IPV6 !! IPPROTO::IP;
     my $socket = socket($domain, SOCK::STREAM, 0);
+    fail Errno(-$socket) if $socket < 0;
     my $addr = $domain ~~ AF::INET6
       ?? sockaddr_in6.new($address, $port)
       !! sockaddr_in.new($address, $port);
     $ring.connect($socket, $addr).then: -> $cmp {
-      use nqp;
       my $client_socket := nqp::create(self);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!socket', $socket);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ring', $ring);
@@ -104,7 +105,6 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   }
 
   sub setup-close(\socket --> Nil) {
-    use nqp;
     my $p := Promise.new;
     nqp::bindattr(socket, IO::URing::Socket::INET, '$!close-promise', $p);
     nqp::bindattr(socket, IO::URing::Socket::INET, '$!close-vow', $p.vow);
