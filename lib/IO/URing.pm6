@@ -75,11 +75,11 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
             $result = $temp.res;
             $flags = $temp.flags;
             io_uring_cqe_seen($!ring, $cqe_ptr.deref);
-            my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
             if $result < 0 {
-              $vow.keep(Failure.new(Errno(-$result)));
+              $vow.keep(Failure.new("{IORING_OP($request.opcode)} returned result {Errno(-$result)}"));
             }
             else {
+              my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
               $vow.keep($cmp);
             }
           }
