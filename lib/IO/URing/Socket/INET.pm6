@@ -189,20 +189,20 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       $socket-vow.keep($socket);
       $host-vow.keep(~$!host);
       $port-vow.keep(+$!port);
+      my $handle;
       $lock.protect: {
         my $cancellation := $!scheduler.cue: -> {
           loop {
-            my $handle = $!ring.accept($socket);
-            await $handle.then: -> $cmp {
+            $handle := $!ring.accept($socket);
+            $handle.then: -> $cmp {
               if $finished {
                 # do nothing
               }
-              elsif $cmp ~~ Exception {
-                my $exc = X::AdHoc.new(payload => strerror($cmp));
-                quit($exc);
-                $host-vow.break($exc) unless $host-vow.promise;
-                $port-vow.break($exc) unless $port-vow.promise;
+              elsif $cmp.status ~~ Broken {
+                $host-vow.break($cmp.cause) unless $host-vow.promise;
+                $port-vow.break($cmp.cause) unless $port-vow.promise;
                 $finished = 1;
+                quit($cmp.cause);
               }
               else {
                 my \fd = $cmp.result.result;
@@ -219,6 +219,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
                 emit($client_socket);
               }
             };
+            await $handle;
             last if $finished;
           }
         };
