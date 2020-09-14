@@ -178,6 +178,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       my $host-vow = $socket-host.vow;
       my $port-vow = $socket-port.vow;
       my $socket = socket($!domain, SOCK::STREAM, 0);
+      fail(Errno(-$socket)) if $socket < 0;
       reuseaddr($socket, $!reuseaddr) if $!reuseaddr;
       reuseport($socket, $!reuseport) if $!reuseport;
       my $addr = $!domain ~~ AF::INET6
