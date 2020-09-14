@@ -129,24 +129,30 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       if $!queue.poll -> (:key($v), :value($subs)) {
         @handles = do for @$subs -> Submission $sub {
           my Handle $p .= new;
-          my $sqe := io_uring_get_sqe($!ring);
-          without $sqe {
-            io_uring_submit($!ring);
-            $sqe := io_uring_get_sqe($!ring);
-          }
-          $p.break(Failure.new("No more room in ring")) unless $sqe.defined;
-          memcpy(nativecast(Pointer, $sqe), nativecast(Pointer, $sub.sqe), nativesizeof($sqe));
-          with $sub.addr {
-            $sqe.addr = $sub.addr ~~ Int ?? $sub.addr !! +nativecast(Pointer, $_);
-          }
-          $sqe.user_data = self!store($p.vow, $sqe, $sub.data // Nil);
-          with $sub.then {
-            my $promise = $p.then($sub.then);
-            $promise!Handle::slot = $sqe.user_data;
-            $promise
+          with $sub.sqe {
+            my $sqe := io_uring_get_sqe($!ring);
+            without $sqe {
+                io_uring_submit($!ring);
+                $sqe := io_uring_get_sqe($!ring);
+            }
+            $p.break("No more room in ring") unless $sqe.defined;
+            memcpy(nativecast(Pointer, $sqe), nativecast(Pointer, $sub.sqe), nativesizeof($sqe));
+            with $sub.addr {
+                $sqe.addr = $sub.addr ~~ Int ?? $sub.addr !! +nativecast(Pointer, $_);
+            }
+            $sqe.user_data = self!store($p.vow, $sqe, $sub.data // Nil);
+            with $sub.then {
+                my $promise = $p.then($sub.then);
+                $promise!Handle::slot = $sqe.user_data;
+                $promise
+            }
+            else {
+                $p!Handle::slot = $sqe.user_data;
+                $p
+            }
           }
           else {
-            $p!Handle::slot = $sqe.user_data;
+            self!pseudo-op-handler($sub);
             $p
           }
         }
@@ -157,6 +163,10 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     CATCH {
       default { die $_ }
     }
+  }
+
+  method !pseudo-op-handler(Submission $sub) {
+    io_uring_submit($!ring);
   }
 
   method !close() {
