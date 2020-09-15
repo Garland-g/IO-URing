@@ -79,25 +79,27 @@ role IO::URing::Socket is export {
         $cancellation := $!scheduler.cue: -> {
           if $!dgram {
             # UDP
-            $handle = $!ring.recvfrom($!socket, $buffer, 0, $sockaddr).then: -> $cmp {
-              $lock.protect: {
-                unless $finished {
-                  if $cmp ~~ Exception {
-                    quit(X::AdHoc.new(payload => strerror($cmp)));
-                    $finished = 1;
-                  }
-                  elsif $cmp.result.result > 0 {
-                    my \bytes = $cmp.result.result;
-                    Any ~~ $!datagram
-                      ?? emit($buffer.subbuf(^bytes))
-                      !! emit($!datagram.new(:data($buffer.subbuf(^bytes)), :$sockaddr));
-                  }
-                  else {
+            loop {
+              $handle = $!ring.recvfrom($!socket, $buffer, 0, $sockaddr).then: -> $cmp {
+                $lock.protect: {
+                  unless $finished {
+                    if $cmp ~~ Exception {
+                      quit(X::AdHoc.new(payload => strerror($cmp)));
+                      $finished = 1;
+                    }
+                    elsif $cmp.result.result > 0 {
+                      my \bytes = $cmp.result.result;
+                      Any ~~ $!datagram
+                        ?? emit($buffer.subbuf(^bytes))
+                        !! emit($!datagram.new(:data($buffer.subbuf(^bytes)), :$sockaddr));
+                    }
+                    else {
+                    }
                   }
                 }
-              }
-            };
-            await $handle;
+              };
+              await $handle;
+            }
           }
           else {
             #TCP
