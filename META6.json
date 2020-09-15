@@ -17,7 +17,8 @@
     "IO::URing::Raw" : "lib/IO/URing/Raw.pm6",
     "IO::URing::Socket" : "lib/IO/URing/Socket.pm6",
     "IO::URing::Socket::INET" : "lib/IO/URing/Socket/INET.pm6",
-    "IO::URing::Socket::Raw" : "lib/IO/URing/Socket/Raw.pm6"
+    "IO::URing::Socket::Raw" : "lib/IO/URing/Socket/Raw.pm6",
+    "IO::URing::Socket::UNIX" : "lib/IO/URing/Socket/UNIX.pm6"
   },
   "resources" : [
     "libraries/uringraku"
