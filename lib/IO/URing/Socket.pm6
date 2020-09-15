@@ -34,12 +34,12 @@ role IO::URing::Socket is export {
   method write(IO::URing::Socket:D: Blob:D $buf) {
     my $p := Promise.new;
     my $v := $p.vow;
-    $!ring.send($!socket, $buf).then: -> Mu \cmp {
-      if cmp.result < 0 {
-        $v.break(strerror(cmp.result));
+    $!ring.send($!socket, $buf).then: -> $cmp {
+      if $cmp.result.result < 0 {
+        $v.break(strerror(-$cmp.result.result));
       }
       else {
-        $v.keep(cmp.result);
+        $v.keep($cmp.result.result);
       }
     };
     $p;
@@ -106,7 +106,7 @@ role IO::URing::Socket is export {
               $lock.protect: {
                 unless $finished {
                   if $cmp ~~ Exception {
-                    quit(x::AdHoc.new(payload => strerror($cmp)));
+                    quit(x::AdHoc.new(payload => strerror(-$cmp.result.result)));
                     $finished = 1;
                   }
                   else {

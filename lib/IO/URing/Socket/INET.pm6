@@ -2,7 +2,6 @@ use IO::URing;
 use IO::URing::Socket;
 use IO::URing::Socket::Raw :ALL;
 use Universal::errno;
-use Universal::errno::Constants;
 use NativeCall;
 use Constants::Sys::Socket :ALL;
 use Constants::Netinet::In :ALL;
@@ -82,7 +81,6 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     my $domain = $ip6 ?? AF::INET6 !! AF::INET;
     my $ipproto = $ip6 ?? IPPROTO::IPV6 !! IPPROTO::IP;
     my $socket = socket($domain, SOCK::STREAM, 0);
-    fail Errno(-$socket) if $socket < 0;
     my $addr = $domain ~~ AF::INET6
       ?? sockaddr_in6.new($address, $port)
       !! sockaddr_in.new($address, $port);
@@ -178,7 +176,6 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       my $host-vow = $socket-host.vow;
       my $port-vow = $socket-port.vow;
       my $socket = socket($!domain, SOCK::STREAM, 0);
-      fail(Errno(-$socket)) if $socket < 0;
       reuseaddr($socket, $!reuseaddr) if $!reuseaddr;
       reuseport($socket, $!reuseport) if $!reuseport;
       my $addr = $!domain ~~ AF::INET6
