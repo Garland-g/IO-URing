@@ -465,13 +465,12 @@ class io_uring is repr('CStruct') {
 
   method wait(io_uring:D: ) {
     my Pointer[io_uring_cqe] $ptr .= new;
-    my \ret = io_uring_wait_cqe(self, $ptr);
-    if ret < 0 {
-      my $failure = fail errno.symbol;
-      set_errno(0);
-      return $failure;
+    with io_uring_wait_cqe(self, $ptr) {
+      return $ptr;
     }
-    return $ptr;
+    else {
+      return $_;
+    }
   }
 
   method arm(io_uring:D: $eventfd) {
@@ -514,35 +513,26 @@ enum IORING_REGISTER (
   IORING_UNREGISTER_PERSONALITY => 10,
 );
 
-sub _io_uring_queue_init_params(uint32 $entries, io_uring:D, io_uring_params:D) returns int32 is native(LIB) is symbol('io_uring_queue_init_params') { ... }
+sub _io_uring_queue_init_params(uint32 $entries, io_uring:D, io_uring_params:D)
+        returns int32 is native(LIB) is symbol('io_uring_queue_init_params') is error-model<neg-errno> { ... }
 
 sub io_uring_queue_init_params(UInt $entries, io_uring:D $ring, io_uring_params:D $params) returns int32 {
   my uint32 $entries-u32 = $entries;
-  my int32 $result = _io_uring_queue_init_params($entries-u32, $ring, $params);
-  return $result < 0
-  ?? do {
-    fail "ring setup failed";
-  }
-  !! $result;
+  _io_uring_queue_init_params($entries-u32, $ring, $params);
 }
 
 sub io_uring_queue_init(UInt $entries, io_uring:D $ring, UInt $flags) returns int32 {
   my uint32 $entries-u32 = $entries;
   my uint32 $flags-u32 = $flags;
-  my int32 $result = _io_uring_queue_init($entries-u32, $ring, $flags-u32);
-  return $result < 0
-  ?? do {
-    fail "ring setup failed";
-  }
-  !! $result;
+  _io_uring_queue_init($entries-u32, $ring, $flags-u32);
 }
 
 sub _io_uring_queue_init(uint32 $entries, io_uring:D, uint32 $flags) returns int32
-  is native(LIB) is symbol('io_uring_queue_init') { ... }
+  is native(LIB) is symbol('io_uring_queue_init') is error-model<neg-errno> { ... }
 
 #sub io_uring_queue_mmap(int32 $fd, io_uring_params:D, io_uring:D) is native(LIB) { ... }
 
-sub io_uring_ring_dontfork(io_uring:D) is native(LIB) { ... }
+sub io_uring_ring_dontfork(io_uring:D --> int32) is native(LIB) is error-model<neg-errno> { ... }
 sub io_uring_queue_exit(io_uring:D) is native(LIB) { ... }
 
 sub io_uring_submit(|c) returns int32 {
@@ -556,16 +546,7 @@ sub io_uring_submit(|c) returns int32 {
 
 sub _io_uring_submit(io_uring:D --> int32) is native(LIB) is symbol('io_uring_submit') { ... }
 
-sub _io_uring_submit_and_wait(io_uring:D, uint32 $wait_nr) is native(LIB) returns int32 is symbol('io_uring_submit_and_wait') { ... }
-
-sub io_uring_submit_and_wait(|c) {
-  my int32 $result = _io_uring_submit_and_wait(|c);
-  return $result < 0
-  ?? do {
-    fail "sqe submit and wait failed: $result";
-  }
-  !! $result
-}
+sub io_uring_submit_and_wait(io_uring:D, uint32 $wait_nr) is native(LIB) returns int32 { ... }
 
 sub io_uring_peek_batch_cqe(io_uring:D, Pointer[io_uring_cqe] is rw, uint32) returns uint32 is native(LIB) { ... }
 
@@ -578,23 +559,14 @@ sub io_uring_peek_batch_cqe(io_uring:D, Pointer[io_uring_cqe] is rw, uint32) ret
 #}
 
 sub __io_uring_get_cqe(io_uring:D, Pointer[io_uring_cqe] is rw, uint32, uint32, Pointer) returns int32
-  is native(LIB) { ... }
+  is native(LIB) is error-model<neg-errno> { ... }
 
 sub io_uring_wait_cqe_nr(io_uring:D \ring, Pointer[io_uring_cqe] $cqe-ptr is rw, uint32 \wait-nr) returns int32 {
   return __io_uring_get_cqe(ring, $cqe-ptr, 0, wait-nr, Pointer);
 }
 
-sub _io_uring_wait_cqe_timeout(io_uring:D, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32
-  is native(LIB) is symbol('io_uring_wait_cqe_timeout') { ... }
-
-sub io_uring_wait_cqe_timeout(|c) returns int32 {
-  my int32 $result = _io_uring_wait_cqe_timeout(|c);
-  return $result != 0
-  ?? do {
-    fail "io_uring_wait_cqe_timout=$result"
-  }
-  !! $result
-}
+sub io_uring_wait_cqe_timeout(io_uring:D, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32
+  is native(LIB) is error-model<neg-errno> { ... }
 
 sub _io_uring_get_sqe(io_uring:D) returns io_uring_sqe is native(LIB) is symbol('io_uring_get_sqe') { ... }
 
