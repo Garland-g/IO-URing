@@ -4,7 +4,6 @@ die "Must be loaded on Linux 5.1 or higher"
   unless $*KERNEL ~~ 'linux' && $version ~~ v5.1+;
 
 use NativeCall;
-use NativeHelpers::iovec;
 use IO::URing::Socket::Raw :ALL;
 use Universal::errno;
 
