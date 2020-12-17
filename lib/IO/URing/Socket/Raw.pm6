@@ -46,7 +46,7 @@ raw(--> uint32) (returns in Network Byte Order)
 =end pod
 
 class in_addr is repr('CStruct') is export(:in_addr) {
-  has uint32 $.s-addr is rw; # In Network Byte Order
+  has uint32 $.s-addr; # Stored in Network Byte Order
 
   multi submethod BUILD(UInt :$s-addr!) {
     $!s-addr = $s-addr;
