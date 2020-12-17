@@ -6,3 +6,5 @@ my $probe = io_uring_get_probe();
 is $probe.opcode-supported(0), True, "Supports NOP";
 
 $probe.free;
+
+done-testing;
