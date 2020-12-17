@@ -561,7 +561,7 @@ sub io_uring_peek_batch_cqe(io_uring:D, Pointer[io_uring_cqe] is rw, uint32) ret
 sub __io_uring_get_cqe(io_uring:D, Pointer[io_uring_cqe] is rw, uint32, uint32, Pointer) returns int32
   is native(LIB) is error-model<neg-errno> { ... }
 
-sub io_uring_wait_cqe_nr(io_uring:D \ring, Pointer[io_uring_cqe] $cqe-ptr is rw, uint32 \wait-nr) returns int32 {
+sub io_uring_wait_cqe_nr(io_uring:D \ring, Pointer[io_uring_cqe] $cqe-ptr is rw, uint32 \wait-nr) returns int32 is inlinable {
   return __io_uring_get_cqe(ring, $cqe-ptr, 0, wait-nr, Pointer);
 }
 
@@ -575,13 +575,13 @@ sub io_uring_get_sqe(io_uring:D $ring) returns io_uring_sqe {
   $sqe.defined ?? $sqe !! Failure.new("Submission ring is out of room");
 }
 
-sub io_uring_wait_cqe(|c) {
+sub io_uring_wait_cqe(|c) is inlinable {
   return io_uring_wait_cqe_timeout(|c, kernel_timespec);
 }
 
 sub io_uring_cqe_seen(io_uring:D $ring, io_uring_cqe:D $cqe) is native(%?RESOURCES<libraries/uringraku>) is symbol('io_uring_cqe_seen_wrapper') { ... }
 
-sub io_uring_prep_rw(Int \op, io_uring_sqe:D $sqe, Int \fd, $addr, Int \len, Int \offset) {
+sub io_uring_prep_rw(Int \op, io_uring_sqe:D $sqe, Int \fd, $addr, Int \len, Int \offset) is inlinable {
   $sqe.opcode = op;
   $sqe.flags = 0;
   $sqe.ioprio = 0;
@@ -594,64 +594,64 @@ sub io_uring_prep_rw(Int \op, io_uring_sqe:D $sqe, Int \fd, $addr, Int \len, Int
   $sqe.pad0 = $sqe.pad1 = $sqe.pad2 = 0;
 }
 
-sub io_uring_prep_nop(io_uring_sqe:D $sqe --> Nil) {
+sub io_uring_prep_nop(io_uring_sqe:D $sqe --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_NOP, $sqe, -1, Pointer, 0, 0);
 }
 
-sub io_uring_prep_readv(io_uring_sqe:D $sqe, $fd, Pointer $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
+sub io_uring_prep_readv(io_uring_sqe:D $sqe, $fd, Pointer $iovecs, UInt $nr_vecs, Int $offset --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_READV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
 }
 
-sub io_uring_prep_writev(io_uring_sqe:D $sqe, $fd, Pointer $iovecs, UInt $nr_vecs, Int $offset --> Nil) {
+sub io_uring_prep_writev(io_uring_sqe:D $sqe, $fd, Pointer $iovecs, UInt $nr_vecs, Int $offset --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_WRITEV, $sqe, $fd, $iovecs, $nr_vecs, $offset);
 }
 
-sub io_uring_prep_fsync(io_uring_sqe:D $sqe, $fd, UInt $fsync_flags --> Nil) {
+sub io_uring_prep_fsync(io_uring_sqe:D $sqe, $fd, UInt $fsync_flags --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_FSYNC, $sqe, $fd, Str, 0, 0);
   $sqe.union-flags = $fsync_flags +& 0xFFFFFFFF;
 }
 
-sub io_uring_prep_poll_add(io_uring_sqe:D $sqe, $fd, Int $poll_mask --> Nil) {
+sub io_uring_prep_poll_add(io_uring_sqe:D $sqe, $fd, Int $poll_mask --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_POLL_ADD, $sqe, $fd, Str, 0, 0);
   $sqe.union-flags = $poll_mask +& 0xFFFF;
 }
 
-sub io_uring_prep_poll_remove(io_uring_sqe:D $sqe, Int $user_data --> Nil) {
+sub io_uring_prep_poll_remove(io_uring_sqe:D $sqe, Int $user_data --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_POLL_REMOVE, $sqe, -1, $user_data, 0, 0);
 }
 
-sub io_uring_prep_recvmsg(io_uring_sqe:D $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) {
+sub io_uring_prep_recvmsg(io_uring_sqe:D $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_RECVMSG, $sqe, $fd, $msg, 1, 0);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_sendmsg(io_uring_sqe:D $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) {
+sub io_uring_prep_sendmsg(io_uring_sqe:D $sqe, $fd, Pointer $msg, uint32 $flags --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_SENDMSG, $sqe, $fd, $msg, 1, 0);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_cancel(io_uring_sqe:D $sqe, UInt $flags, Int $user_data --> Nil) {
+sub io_uring_prep_cancel(io_uring_sqe:D $sqe, UInt $flags, Int $user_data --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_ASYNC_CANCEL, $sqe, -1, $user_data, 0, 0);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_accept(io_uring_sqe:D $sqe, $fd, $flags, $addr --> Nil) {
+sub io_uring_prep_accept(io_uring_sqe:D $sqe, $fd, $flags, $addr --> Nil) is inlinable {
   my $size = $addr.defined ?? $addr.size !! 0;
   my $address = $addr.defined ?? nativecast(Pointer, $addr) !! Str;
   io_uring_prep_rw(IORING_OP_ACCEPT, $sqe, $fd, $address, 0, $size);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_connect(io_uring_sqe:D $sqe, $fd, sockaddr() $addr --> Nil) {
+sub io_uring_prep_connect(io_uring_sqe:D $sqe, $fd, sockaddr() $addr --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_CONNECT, $sqe, $fd, nativecast(Pointer, $addr), 0, $addr.size);
 }
 
-sub io_uring_prep_send(io_uring_sqe:D $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) {
+sub io_uring_prep_send(io_uring_sqe:D $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) is inlinable {
   io_uring_prep_rw(IORING_OP_SEND, $sqe, $fd, $buf, $len, 0);
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_recv(io_uring_sqe:D $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) {
+sub io_uring_prep_recv(io_uring_sqe:D $sqe, $fd, Pointer[void] $buf, Int $len, Int $flags ) is inlinable {
   io_uring_prep_rw(IORING_OP_RECV, $sqe, $fd, $buf, $len, 0);
   $sqe.union-flags = $flags;
 }
@@ -667,7 +667,7 @@ sub io_uring_prep_recv(io_uring_sqe:D $sqe, $fd, Pointer[void] $buf, Int $len, I
 #  io_uring_register_files($ring, nativecast(Pointer[int32], $arr), $count);
 #}
 
-sub io_uring_cqe_get_data(io_uring_cqe:D $cqe --> Pointer) { Pointer[void].new(+$cqe.user_data) }
+sub io_uring_cqe_get_data(io_uring_cqe:D $cqe --> Pointer) is inlinable { Pointer[void].new(+$cqe.user_data) }
 
 sub io_uring_get_probe_ring(io_uring:D --> io_uring_probe) is native(LIB) { ... }
 
