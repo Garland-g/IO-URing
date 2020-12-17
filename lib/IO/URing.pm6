@@ -67,7 +67,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
         my uint64 $jobs;
       loop {
         my $ret = io_uring_wait_cqe($!ring, $cqe_ptr);
-        $!close-vow.break(Errno(-$ret)) if $ret < 0; # Something has gone very wrong
+        $!close-vow.break($ret.Exception) if $ret ~~ Failure; # Something has gone very wrong
         if +$cqe_ptr > 0 {
           my io_uring_cqe $temp := $cqe_ptr.deref;
           if $temp.user_data {
