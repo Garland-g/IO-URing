@@ -155,21 +155,30 @@ class io_uring_probe is repr('CStruct') {
   has uint16 $.resv;
   HAS uint32 @.resv2[3] is CArray;
 
+  constant op-size = BEGIN { nativesizeof(io_uring_probe_op) };
+
+  my sub parse-probe-op(io_uring_probe_op $probe-op --> Bool) is inlinable {
+      return ($probe-op.flags +& IO_URING_OP_SUPPORTED).Bool;
+  }
+
   method supported-ops(--> Hash) {
     my %ops;
     my $ptr = Pointer[int64].new(nativesizeof(self) + nativecast(Pointer[int64], self));
-
-    my sub parse-probe-op(io_uring_probe_op $probe-op --> Bool) {
-      return ($probe-op.flags +& IO_URING_OP_SUPPORTED).Bool;
-    }
 
     for ^$!last-op -> $opcode {
       my $name = IORING_OP($opcode);
       last if $name == IORING_OP_LAST;
       %ops{IORING_OP($name)} = parse-probe-op(nativecast(io_uring_probe_op, $ptr));
-      $ptr = Pointer[int64].new(8 + $ptr);
+      $ptr = Pointer[int64].new(op-size + $ptr);
     }
     return %ops;
+  }
+
+  method opcode-supported(Int $op) {
+    my $ptr = Pointer[int64].new(nativesizeof(self) + nativecast(Pointer[int64], self));
+    $ptr = Pointer[int64].new($ptr + $op * op-size);
+    return parse-probe-op(nativecast(io_uring_probe_op, $ptr));
+
   }
 
   method free(\SELF: --> Nil) {
