@@ -68,7 +68,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
       loop {
         my $ret = io_uring_wait_cqe($!ring, $cqe_ptr);
         $!close-vow.break($ret.Exception) if $ret ~~ Failure; # Something has gone very wrong
-        if +$cqe_ptr > 0 {
+        if +$cqe_ptr != 0 {
           my io_uring_cqe $temp := $cqe_ptr.deref;
           if $temp.user_data {
             ($vow, $request, $data) = self!retrieve($temp.user_data);
