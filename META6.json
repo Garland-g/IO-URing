@@ -1,30 +1,31 @@
 {
-  "auth" : "cpan:GARLANDG",
-  "authors" : [
+  "auth": "cpan:GARLANDG",
+  "authors": [
     "Travis Gibson"
   ],
-  "build-depends" : [ ],
-  "depends" : [
+  "depends": [
     "NativeHelpers::iovec",
     "Universal::errno"
-   ],
-  "description" : "Access the io_uring interface from Raku",
-  "license" : "Artistic-2.0",
-  "name" : "IO::URing",
-  "perl" : "6.d",
-  "provides" : {
-    "IO::URing" : "lib/IO/URing.pm6",
-    "IO::URing::Raw" : "lib/IO/URing/Raw.pm6",
-    "IO::URing::Socket" : "lib/IO/URing/Socket.pm6",
-    "IO::URing::Socket::INET" : "lib/IO/URing/Socket/INET.pm6",
-    "IO::URing::Socket::Raw" : "lib/IO/URing/Socket/Raw.pm6",
-    "IO::URing::Socket::UNIX" : "lib/IO/URing/Socket/UNIX.pm6"
+  ],
+  "description": "Access the io_uring interface from Raku",
+  "license": "Artistic-2.0",
+  "name": "IO::URing",
+  "perl": "6.d",
+  "provides": {
+    "IO::URing": "lib/IO/URing.pm6",
+    "IO::URing::Raw": "lib/IO/URing/Raw.pm6",
+    "IO::URing::Socket": "lib/IO/URing/Socket.pm6",
+    "IO::URing::Socket::INET": "lib/IO/URing/Socket/INET.pm6",
+    "IO::URing::Socket::Raw": "lib/IO/URing/Socket/Raw.pm6",
+    "IO::URing::Socket::UNIX": "lib/IO/URing/Socket/UNIX.pm6"
   },
-  "resources" : [
+  "resources": [
     "libraries/uringraku"
   ],
-  "source-url" : "",
-  "tags" : [ ],
-  "test-depends" : [ ],
-  "version" : "0.0.1"
+  "source-url": "",
+  "tags": [
+  ],
+  "test-depends": [
+  ],
+  "version": "0.0.1"
 }
