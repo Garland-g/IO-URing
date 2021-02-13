@@ -587,7 +587,7 @@ sub io_uring_wait_cqe(|c) is inlinable {
   return io_uring_wait_cqe_timeout(|c, kernel_timespec);
 }
 
-sub io_uring_cqe_seen(io_uring:D $ring, io_uring_cqe:D $cqe) is native(%?RESOURCES<libraries/uringraku>) is symbol('io_uring_cqe_seen_wrapper') { ... }
+sub io_uring_cqe_seen(io_uring:D $ring, io_uring_cqe:D $cqe) is native(%?RESOURCES<libraries/uringhelper>) is symbol('io_uring_cqe_seen_wrapper') { ... }
 
 sub io_uring_prep_rw(Int \op, io_uring_sqe:D $sqe, Int \fd, $addr, Int \len, Int \offset) is inlinable {
   $sqe.opcode = op;

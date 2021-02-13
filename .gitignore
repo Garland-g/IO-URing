@@ -1,8 +1,9 @@
 /blib/
-/src/*.o
-/src/*.so
 /.panda-work
 /resources/*.so
 /resources/*.dylib
 .precomp/
 /io_uring-*
+/examples/*
+/wip-t/*
+/.idea/*

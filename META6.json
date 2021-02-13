@@ -3,6 +3,17 @@
   "authors": [
     "Travis Gibson"
   ],
+  "build": {
+    "makefile-variables": {
+      "uringhelper": {
+        "resource": "libraries/uringhelper"
+      }
+    }
+  },
+  "build-depends": [
+    "Distribution::Builder::MakeFromJSON:ver<0.6+>"
+  ],
+  "builder": "Distribution::Builder::MakeFromJSON",
   "depends": [
     "NativeHelpers::iovec",
     "Universal::errno"
@@ -20,7 +31,7 @@
     "IO::URing::Socket::UNIX": "lib/IO/URing/Socket/UNIX.pm6"
   },
   "resources": [
-    "libraries/uringraku"
+    "libraries/uringhelper"
   ],
   "source-url": "",
   "tags": [

@@ -1,0 +1,20 @@
+.PHONY: clean test
+	CC = %CC%
+	RAKU = %EXECUTABLE%
+
+all: %uringhelper%
+
+clean:
+	rm -f "%uringhelper%"
+	find . -name .precomp -prune -exec rm -rf "{}" \;
+	rm -f Makefile
+
+%uringhelper%: uringhelper.c
+	$(CC) -Wall uringhelper.c -shared -o "%uringhelper%" -fPIC -g
+	strip --strip-unneeded %uringhelper%
+
+test: all
+	prove -e "$(RAKU) -I." t
+
+install: all
+	$(RAKU) configure.raku --install
