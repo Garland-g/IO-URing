@@ -384,7 +384,9 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-fsync($fd.native-descriptor, |c)
   }
 
-  multi method prep-fsync(Int $fd, UInt $union-flags, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+  #| Prepare an fsync operation.
+  #| fsync-flags can be set to IORING_FSYNC_DATASYNC to use fdatasync(2) instead. Defaults to fsync(2).
+  multi method prep-fsync(Int $fd, UInt $fsync-flags = 0, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
                   :sqe(io_uring_sqe.new:
@@ -395,14 +397,16 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                     :off(0),
                     :addr(0),
                     :len(0),
-                    :union-flags($union-flags +& 0xFFFFFFFF),
+                    :union-flags($fsync-flags +& 0xFFFFFFFF),
                   ),
                   :$data,
                   );
   }
 
-  method fsync($fd, UInt $flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
-    self.submit(self.prep-fsync($fd, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
+  #| Prepare and submit an fsync operation.
+  #| See prep-fsync for details.
+  method fsync($fd, UInt $fsync-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    self.submit(self.prep-fsync($fd, $fsync-flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
   multi method prep-poll-add($fd, |c --> Submission) {
