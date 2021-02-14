@@ -1,3 +1,63 @@
+=begin pod
+
+=head1 NAME
+
+IO::URing::Socket - A socket interface on top of IO::URing.
+
+=head1 SYNOPSIS
+
+Sample INET Socket usage
+
+=begin code :lang<raku>
+
+# Server
+use IO::URing::Socket::INET;
+
+react {
+  whenever IO::URing::Socket::INET.listen('127.0.0.1', 3333, :reuseaddr, :reuseport) -> $conn {
+    whenever $conn.Supply.lines -> $line {
+      $conn.print: "$line" ~ "\n";
+      $conn.close;
+    }
+  }
+  CATCH {
+    default {
+      say .^name, ': ', .Str;
+      say "handled in $?LINE";
+    }
+  }
+}
+
+# Client
+
+use IO::URing::Socket::INET;
+
+await IO::URing::Socket::INET.connect('127.0.0.1', 3333).then( -> $promise {
+  given $promise.result -> $conn {
+
+    $conn.print("Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n");
+    react {
+      whenever $conn.Supply().lines -> $v {
+        $v.say;
+        done;
+      }
+    }
+    $conn.close;
+  }
+});
+
+=end code
+
+=head1 DESCRIPTION
+
+IO::URing::Socket is a role that contains code common to all IO::URing sockets.
+It implements the same interface as IO::Socket::Async.
+
+=head2 IO::URing::Socket methods
+
+=end pod
+
+
 use IO::URing;
 use IO::URing::Socket::Raw :ALL;
 use Universal::errno;
@@ -27,10 +87,12 @@ role IO::URing::Socket is export {
         "IO::URing::Socket.dgram, or IO::URing::Socket.bind-dgram.";
   }
 
-  method print(IO::URing::Socket:D: Str() $str) {
+  #| Send a Str over the socket connection
+  method print(IO::URing::Socket:D: Str(Cool) $str) {
     self.write($!encoder.encode-chars($str));
   }
 
+  #| Send a Blob over the socket connection
   method write(IO::URing::Socket:D: Blob:D $buf) {
     my $p := Promise.new;
     my $v := $p.vow;
@@ -145,6 +207,7 @@ role IO::URing::Socket is export {
     method serial(--> True) {}
   }
 
+  #| Get a Supply for the socket. Will emit values whenever a message is received.
   multi method Supply(IO::URing::Socket:D: :$bin, :$datagram, :$enc = 'utf-8', :$scheduler = $*SCHEDULER) {
     my $dgram = $datagram ?? $!datagram !! Any;
     if $bin {
@@ -166,6 +229,7 @@ role IO::URing::Socket is export {
     }
   }
 
+  #| Close the socket.
   method close(IO::URing::Socket:D: --> True) {
     $!ring.close-fd($!socket) unless $!dgram;
     $!ring.close if $!acceptable;
@@ -176,6 +240,7 @@ role IO::URing::Socket is export {
   #| See specific socket type for details.
   method connect(IO::URing::Socket:U: Str $host, $port?, |c) { ... }
 
+  #| Get the underlying descriptor for the socket.
   method native-descriptor(--> Int) {
     $!socket;
   }
@@ -215,7 +280,10 @@ role IO::URing::Socket is export {
     )
   }
 
-  multi method reuseaddr(IO::URing::Socket:D: --> Bool) {
+  #| Get the current value of SO_REUSEADDR.
+  #| SO_REUSEADDR allows re-binding to the socket without
+  #| waiting for the TIME_WAIT period.
+  method reuseaddr(IO::URing::Socket:D: --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
     my buf8 $len .= new;
@@ -242,7 +310,9 @@ role IO::URing::Socket is export {
     )
   }
 
-  multi method reuseport(IO::URing::Socket:D: --> Bool) {
+  #| Get the current value of SO_REUSEPORT.
+  #| SO_REUSEPORT allows multiple sockets to bind to the same port.
+  method reuseport(IO::URing::Socket:D: --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
     my buf8 $len .= new;
@@ -257,6 +327,8 @@ role IO::URing::Socket is export {
     $opt.read-uint32(0).Bool;
   }
 
+  #| Get the current value of SO_ACCEPTCONN.
+  #| SO_ACCEPTCONN returns true if the socket is listening.
   method acceptconn(IO::URing::Socket:D: --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
@@ -284,6 +356,9 @@ role IO::URing::Socket is export {
     )
   }
 
+  #| Get the current device that the socket is bound to.
+  #| SO_BINDTODEVICE only allows the socket to communicate over
+  #| the named device.
   multi method bindtodevice(IO::URing::Socket:D: --> Str) {
     my buf8 $opt .= allocate(16);
     my buf8 $len .= new;
@@ -310,6 +385,9 @@ role IO::URing::Socket is export {
     );
   }
 
+  #| Get the current value of SO_BROADCAST on the socket.
+  #| SO_BROADCAST determines whether or not the socket can
+  #| send messages to the broadcast address.
   multi method broadcast(IO::URing::Socket:D: --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
@@ -325,6 +403,7 @@ role IO::URing::Socket is export {
     $opt.read-uint32(0).Bool;
   }
 
+  #| Get the domain of the socket.
   method domain(IO::URing::Socket:D: --> AF) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
@@ -340,6 +419,7 @@ role IO::URing::Socket is export {
     AF($opt.read-uint32(0));
   }
 
+  #| Get the protocol of the socket.
   method protocol(IO::URing::Socket:D: --> IPPROTO) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
@@ -367,7 +447,10 @@ role IO::URing::Socket is export {
     )
   }
 
-  multi method dontroute(IO::URing::Socket:D: --> Bool) {
+  #| Get the current value of SO_DONTROUTE.
+  #| SO_DONTROUTE determines whether or not to bypass the routing
+  #| table and send messages to the network interface directly.
+  method dontroute(IO::URing::Socket:D: --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
     my buf8 $len .= new;
@@ -382,3 +465,13 @@ role IO::URing::Socket is export {
     $opt.read-uint32(0).Bool;
   }
 }
+
+=begin pod
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2021 Travis Gibson
+
+This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
+
+=end pod

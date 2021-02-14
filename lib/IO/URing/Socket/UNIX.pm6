@@ -7,6 +7,65 @@ use Constants::Sys::Socket :ALL;
 use Constants::Netinet::In;
 use nqp;
 
+=begin pod
+
+=head1 NAME
+
+IO::URing::Socket::UNIX - A UNIX-specific socket class on top of IO::URing::Socket
+
+=head1 SYNOPSIS
+
+Sample UNIX Socket usage
+
+=begin code :lang<raku>
+
+# Server
+use IO::URing::Socket::UNIX;
+
+react {
+  whenever IO::URing::Socket::UNIX.listen("\0/tmp/test.socket") -> $conn {
+    whenever $conn.Supply.lines -> $line {
+      $conn.print("$line\n");
+      $conn.close;
+    }
+  }
+  CATCH {
+    default {
+      say .^name, ': ', .Str;
+      say "handled in $?LINE";
+    }
+  }
+  whenever signal(SIGINT) {
+    done;
+  }
+}
+
+
+# Client
+use IO::URing::Socket::UNIX;
+await IO::URing::Socket::UNIX.connect("\0/tmp/test.socket").then( -> $promise {
+  given $promise.result -> $conn {
+    $conn.print("Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n");
+
+    react whenever $conn.Supply.lines -> $v {
+      $v.say;
+      done;
+    }
+    $conn.close;
+  }
+});
+
+=end code
+
+=head1 DESCRIPTION
+
+IO::URing::Socket::UNIX is a UNIX socket implementation that uses a similar interface to IO::Socket::Async.
+It does the IO::URing::Socket role.
+
+=head2 IO::URing::Socket::UNIX methods
+
+=end pod
+
 class IO::URing::Socket::UNIX does IO::URing::Socket is export {
   my class UNIX-Datagram {
     has str $.host;
@@ -33,6 +92,7 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
   has Str $!peer-host;
   has Str $!socket-host;
 
+  #| Get the host of the local socket.
   method socket-host(--> Str) {
     $!socket-host //= do {
       my int32 $len = sockaddr_in.size;
@@ -41,6 +101,8 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
       $sockaddr.addr.Str;
     }
   }
+
+  #| Get the host of the peer socket.
   method peer-host(--> Str) {
     $!peer-host //= do {
       my int32 $len = sockaddr_in.size;
@@ -50,6 +112,7 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
     }
   }
 
+  #| Connect to an AF_UNIX socket.
   method connect(IO::URing::Socket::UNIX:U: Str $address, :$enc = 'utf-8', IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $p = Promise.new;
     my $v = $p.vow;
@@ -71,6 +134,7 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
     return $p;
   }
 
+  #| Get a native descriptor for the socket suitable for use with setsockopt.
   method native-descriptor(--> Int) {
     $!socket;
   }
@@ -179,6 +243,7 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
     method serial(--> True) { }
   }
 
+  #| Listen for incoming connections.
   method listen(IO::URing::Socket::UNIX:U: Str $host, Int() $backlog = 128,
           :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $domain = AF::UNIX;
@@ -238,6 +303,7 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
     self.write-to($host, $!encoder.encode-chars($str), :$scheduler)
   }
 
+  #| Send a Blob to a remote socket in a datagram.
   method write-to(IO::URing::Socket::UNIX:D: Str() $host, Blob $b, :$scheduler = $*SCHEDULER) {
     my $p = Promise.new;
     my $v = $p.vow;
@@ -253,3 +319,13 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
     $p;
   }
 }
+
+=begin pod
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2021 Travis Gibson
+
+This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
+
+=end pod

@@ -7,6 +7,64 @@ use Constants::Sys::Socket :ALL;
 use Constants::Netinet::In :ALL;
 use nqp;
 
+=begin pod
+
+=head1 NAME
+
+IO::URing::Socket::INET - An INET-specific socket class on top of IO::URing::Socket
+
+=head1 SYNOPSIS
+
+Sample INET Socket usage
+
+=begin code :lang<raku>
+
+# Server
+use IO::URing::Socket::INET;
+
+react {
+  whenever IO::URing::Socket::INET.listen('127.0.0.1', 3333, :reuseaddr, :reuseport) -> $conn {
+    whenever $conn.Supply.lines -> $line {
+      $conn.print: "$line" ~ "\n";
+      $conn.close;
+    }
+  }
+  CATCH {
+    default {
+      say .^name, ': ', .Str;
+      say "handled in $?LINE";
+    }
+  }
+}
+
+# Client
+
+use IO::URing::Socket::INET;
+
+await IO::URing::Socket::INET.connect('127.0.0.1', 3333).then( -> $promise {
+  given $promise.result -> $conn {
+
+    $conn.print("Lorem ipsum dolor sit amet, consectetur adipiscing elit.\n");
+    react {
+      whenever $conn.Supply().lines -> $v {
+        $v.say;
+        done;
+      }
+    }
+    $conn.close;
+  }
+});
+
+=end code
+
+=head1 DESCRIPTION
+
+IO::URing::Socket::INET is a drop-in replacement for IO::Socket::Async with extra features. It does the IO::URing::Socket role.
+
+=head2 IO::URing::Socket::INET methods
+
+=end pod
+
 class IO::URing::Socket::INET does IO::URing::Socket is export {
   my class INET-Datagram {
     has str $.host;
@@ -36,6 +94,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   has Int $!peer-port;
   has Int $!socket-port;
 
+  #| Get the host of the local socket.
   method socket-host(--> Str) {
     $!socket-host //= do {
       my int32 $len = sockaddr_in.size;
@@ -45,6 +104,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       $sockaddr.addr.Str;
     }
   }
+
+  #| Get the port of the local socket.
   method socket-port(--> Int) {
     $!socket-port //= do {
       my int32 $len = sockaddr_in.size;
@@ -54,6 +115,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       $sockaddr.port;
     }
   }
+
+  #| Get the host of the peer socket.
   method peer-host(--> Str) {
     $!peer-host //= do {
       my int32 $len = sockaddr_in.size;
@@ -63,6 +126,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       $sockaddr.addr.Str;
     }
    }
+
+   #| Get the port of the peer socket.
   method peer-port(--> Int) {
     $!peer-port //= do {
       my int32 $len = sockaddr_in.size;
@@ -73,6 +138,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     }
   }
 
+  #| Connect to a remote socket.
   method connect(IO::URing::Socket::INET:U: Str $address, Int $port where IO::Socket::Async::Port-Number, :$ip6,
                 :$enc = 'utf-8', IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $p = Promise.new;
@@ -98,6 +164,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     return $p;
   }
 
+  #| Get a native descriptor for the socket suitable for use with setsockopt.
   method native-descriptor(--> Int) {
     $!socket;
   }
@@ -246,6 +313,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     method serial(--> True) { }
   }
 
+  #| Listen for incoming connections.
   method listen(IO::URing::Socket::INET:U: Str $host, Int $port where IO::Socket::Async::Port-Number,
                 Int() $backlog = 128, :$ip6, :REUSEADDR(:$reuseaddr), :REUSEPORT(:$reuseport),
                 :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
@@ -256,6 +324,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       :$host, :$port, :$ring, :$backlog, :$encoding, :$scheduler, :$domain, :$ipproto, :$reuseport, :$reuseaddr
   }
 
+  #| Set up a socket to send udp datagrams.
   method dgram(IO::URing::Socket::INET:U: :$broadcast, :$ip6, :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $p = Promise.new;
     $scheduler.cue: -> {
@@ -280,10 +349,12 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     await $p;
   }
 
+  #| Set up a socket to send udp datagrams.
   method udp(IO::URing::Socket::INET:U: |c) {
     self.dgram(|c);
   }
 
+  #| Set up a socket to listen for udp datagrams.
   method bind-dgram(IO::URing::Socket::INET:U: Str() $host, Int() $port where IO::Socket::Async::Port-Number, :$ip6,
                    :REUSEADDR(:$reuseaddr), :REUSEPORT(:$reuseport), :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $p = Promise.new;
@@ -312,15 +383,18 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     await $p
   }
 
+  #| Set up a socket to listen for udp datagrams.
   method bind-udp(IO::URing::Socket::INET:U: |c) {
     self.bind-dgram(|c);
   }
 
+  #| Send a Str to a remote socket in a datagram.
   method print-to(IO::URing::Socket::INET:D: Str() $host, Int() $port where IO::Socket::Async::Port-Number,
                   Str() $str, :$scheduler = $*SCHEDULER) {
     self.write-to($host, $port, $!encoder.encode-chars($str), :$scheduler)
   }
 
+  #| Send a Blob to a remote socket in a datagram.
   method write-to(IO::URing::Socket::INET:D: Str() $host, Int() $port where IO::Socket::Async::Port-Number,
                   Blob $b, :$scheduler = $*SCHEDULER) {
     my $p = Promise.new;
@@ -341,6 +415,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
 #                IPPROTO_IP LEVEL               #
 #################################################
 
+  #| Join a multicast group using an ip_mreqn struct.
   multi method add-ip-membership(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool) {
     setsockopt(
       $!socket,
@@ -351,10 +426,12 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     );
   }
 
+  #| Join a multicast group.
   multi method add-ip-membership(IO::URing::Socket::INET:D: $multi-addr, $address = '0.0.0.0', $ifindex = 0 --> Bool) {
     self.add-ip-membership(ip_mreqn.new(:$multi-addr, :$address, :$ifindex));
   }
 
+  #| Leave a multicast group using an ip_mreqn struct.
   multi method drop-ip-membership(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool) {
     setsockopt(
       $!socket,
@@ -365,10 +442,12 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     );
   }
 
+  #| Leave a multicast group.
   multi method drop-ip-membership(IO::URing::Socket::INET:D: $multi-addr, $address = '0.0.0.0', $ifindex = 0 --> Bool) {
     self.drop-ip-membership(ip_mreqn.new(:$multi-addr, :$address, :$ifindex));
   }
 
+  #| Enable or disable multicast loopback on a socket.
   multi method multicast-loopback(IO::URing::Socket::INET:D: Bool $loopback --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint8(0, $loopback ?? 1 !! 0);
@@ -381,6 +460,9 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     );
   }
 
+  #| Get the current value of <IP/IPv6>_MULTICAST_LOOP.
+  #| <IP/IPv6>_MULTICAST_LOOP returns true if the socket is set to receive
+  #| multicast packets sent by other process on the same system.
   multi method multicast-loopback(IO::URing::Socket::INET:D: --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
@@ -396,11 +478,13 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     $opt.read-uint32(0).Bool;
   }
 
+  #| Set the interface to send multicast packets on.
   multi method set-sending-interface(IO::URing::Socket::INET:D: Str $multi-addr, Str $address, $ifindex = 0) returns Bool {
     my $ip-mreqn = ip_mreqn.new(:$multi-addr, :$address, :$ifindex);
     self.set-sending-interface($ip-mreqn);
   }
 
+  #| Set the interface to send multicast packets on using struct ip_mreqn.
   multi method set-sending-interface(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool) {
     setsockopt(
       $!socket,
@@ -411,6 +495,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     ).Bool;
   }
 
+  #| Set the unicast hop limit.
   multi method ttl(IO::URing::Socket::INET:D: Int $ttl --> Bool) {
     my buf8 $opt .= new;
     $opt.write-int32(0, $ttl);
@@ -423,6 +508,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     );
   }
 
+  #| Get the unicast hop limit.
   multi method ttl(IO::URing::Socket::INET:D: --> Int) {
     my buf8 $opt .= new;
     $opt.write-int32(0, 0);
@@ -438,6 +524,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     $opt.read-int32(0);
   }
 
+  #| Set the multicast hop limit.
   multi method multicast-hops(IO::URing::Socket::INET:D: Int $ttl --> Bool) {
     my buf8 $opt .= new;
     $opt.write-int32(0, $ttl);
@@ -450,6 +537,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     );
   }
 
+  #| Get the multicast hop limit.
   multi method multicast-hops(IO::URing::Socket::INET:D: --> Int) {
     my buf8 $opt .= new;
     $opt.write-int32(0, 0);
@@ -465,3 +553,13 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     $opt.read-int32(0);
   }
 }
+
+=begin pod
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2021 Travis Gibson
+
+This library is free software; you can redistribute it and/or modify it under the Artistic License 2.0.
+
+=end pod
