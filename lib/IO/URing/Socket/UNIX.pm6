@@ -187,7 +187,8 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
             :$host, :$ring, :$backlog, :$encoding, :$scheduler
   }
 
-  method dgram(IO::URing::Socket::UNIX:U: :$broadcast, :$enc = 'utf-8', :$scheduler = $*SCHEDULER,
+  #| Set up a socket to send datagrams.
+  method dgram(IO::URing::Socket::UNIX:U: :$enc = 'utf-8', :$scheduler = $*SCHEDULER,
                     :$ring = IO::URing.new(:128entries)) {
     my $p = Promise.new;
     $scheduler.cue: -> {
@@ -203,16 +204,12 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!encoder',
               $encoding.encoder());
       setup-close($client_socket);
-      $client_socket!broadcast(True) if $broadcast;
       $p.keep($client_socket);
     };
     await $p;
   }
 
-  method udp(IO::URing::Socket::UNIX:U: |c) {
-    self.dgram(|c);
-  }
-
+  #| Set up a socket to listen for datagrams
   method bind-dgram(IO::URing::Socket::UNIX:U: Str() $host, :$enc = 'utf-8', :$scheduler = $*SCHEDULER,
                     IO::URing:D :$ring = IO::URing.new(:128entries)) {
     my $p = Promise.new;
@@ -236,10 +233,7 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
     await $p
   }
 
-  method bind-udp(IO::URing::Socket::UNIX:U: |c) {
-    self.bind-dgram(|c);
-  }
-
+  #| Send a Str to a remote socket in a datagram.
   method print-to(IO::URing::Socket::UNIX:D: Str() $host, Str() $str, :$scheduler = $*SCHEDULER) {
     self.write-to($host, $!encoder.encode-chars($str), :$scheduler)
   }
