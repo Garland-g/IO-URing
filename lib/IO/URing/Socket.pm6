@@ -258,11 +258,11 @@ role IO::URing::Socket is export {
 
   #| Send a Str on a dgram socket.
   #| See specific socket type for details.
-  method print-to(IO::URing::Socket:D: Str $host, $port?, Str $str) { ... }
+  method print-to() { ... }
 
   #| Send a Blob on a dgram socket.
   #| See specific socket type for details.
-  method write-to(IO::URing::Socket:D: Str $host, $port?, Blob $buf) { ... }
+  method write-to() { ... }
 
 #################################################
 #                SOL_SOCKET LEVEL               #
