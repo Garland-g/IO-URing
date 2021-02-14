@@ -15,6 +15,7 @@
   ],
   "builder": "Distribution::Builder::MakeFromJSON",
   "depends": [
+    "Constants::Sys::Socket",
     "NativeHelpers::iovec",
     "Universal::errno"
   ],
