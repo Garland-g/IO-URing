@@ -637,140 +637,48 @@ sub ntohl(uint32) returns uint32 is native { ... }
 
 sub htonl(uint32) returns uint32 is native { ... }
 
-sub setsockopt(|c) returns Bool is export(:setsockopt) {
-  my int32 $result = _setsockopt(|c);
-  return $result < 0
-  ?? do {
-    my $failure = fail errno.symbol;
-    set_errno(0);
-    $failure;
-  }
-  !! True;
-}
+sub setsockopt(sockfd $sockfd, int32 $level, int32 $optname, Pointer[void], uint32 $optlen) returns int32 is native is error-model<errno> is export(:setsockopt) {...}
 
-sub _setsockopt(sockfd $sockfd, int32 $level, int32 $optname, Pointer[void], uint32 $optlen) returns int32 is native is symbol('setsockopt') is export(:_setsockopt) {...}
+sub getsockopt(sockfd $sockfd, int32 $level, int32 $optname, Pointer[void] $optval, Pointer[uint32] $optlen) returns int32 is native is error-model<errno> is export(:getsockopt) {...}
 
-sub getsockopt(|c) returns Bool is export(:getsockopt) {
-  my int32 $result = _getsockopt(|c);
-  return $result < 0
-  ?? do {
-    my $failure = fail errno.symbol;
-    set_errno(0);
-    $failure;
-  }
-  !! True;
-}
+sub shutdown(sockfd $sockfd, int32 $how) returns int32 is native is error-model<errno> is export(:shutdown) {...}
 
-sub _getsockopt(sockfd $sockfd, int32 $level, int32 $optname, Pointer[void] $optval, Pointer[uint32] $optlen) returns int32 is native is symbol('getsockopt') is export(:_getsockopt) {...}
-
-sub shutdown(|c) returns Bool is export(:shutdown) {
-  my int32 $result = _shutdown(|c);
-  return $result < 0
-  ?? do {
-    my $failure = fail errno.symbol;
-    set_errno(0);
-    $failure;
-  }
-  !! True;
-}
-
-sub _shutdown(sockfd $sockfd, int32 $how) returns int32 is native is symbol('shutdown') is export(:_shutdown) {...}
+# inet-{n,p}to{p,n} use non-standard error schemes
 
 sub inet-pton(|c) returns Bool is export(:inet-pton) {
   my int32 $result = _inet-pton(|c);
   return True if $result == 1;
   return fail "Invalid address" if $result == 0;
+}
+
+sub _inet-pton(int32, Str, Pointer[void]) returns int32 is native is error-model<errno> is symbol('inet_pton') is export(:_inet-pton) {...}
+
+sub inet-ntop(|c) returns Str is export(:inet-ntop) {
+  my $result = _inet-ntop(|c);
+  return Str if $result ~~ Str:D;
   my $failure = fail errno.symbol;
   set_errno(0);
-  $failure;
+  return $failure;
 }
 
-sub _inet-pton(int32, Str, Pointer[void]) returns int32 is native is symbol('inet_pton') is export(:_inet-pton) {...}
+sub _inet-ntop(int32, Pointer[void], Pointer[uint8], int32) returns Str is native is symbol('inet_ntop') is export(:inet-ntop) {...}
 
-sub inet-ntop(int32, Pointer[void], Pointer[uint8], int32) returns Str is native is symbol('inet_ntop') is export(:inet-ntop) {...}
-
-sub socket(|c) returns sockfd is export(:socket) {
-  my sockfd $result = _socket(|c);
-  return $result < 0
-  ?? do {
-    my $failure = fail errno.symbol;
-    set_errno(0);
-    $failure;
-  }
-  !! $result;
-}
-
-sub _socket(int32 $domain, int32 $type, int32 $protocol) returns sockfd is native is symbol('socket') is export(:_socket) {...}
-
-sub close(|c) returns int32 is export(:close) {
-  my int32 $result = _close(|c);
-  return $result < 0
-  ?? do {
-    my $failure = fail errno.symbol;
-    set_errno(0);
-    $failure;
-  }
-  !! True;
-}
+sub socket(int32 $domain, int32 $type, int32 $protocol) returns sockfd is native is error-model<errno> is export(:socket) {...}
 
 sub get-close(--> Str) {
   return "closesocket" if $*DISTRO.is-win();
   return "close";
 }
 
-sub _close(sockfd $sockfd) returns int32 is native is symbol(get-close) is export(:_close) {...}
+sub close(sockfd $sockfd) returns int32 is native is error-model<errno> is symbol(get-close) is export(:close) {...}
 
-sub bind(|c) returns Bool is export(:bind) {
-  my int32 $result = _bind(|c);
-  return $result < 0
-  ?? do {
-    my $failure = fail errno.symbol;
-    set_errno(0);
-    $failure;
-  }
-  !! True;
-}
+sub bind(sockfd $sockfd, sockaddr $my-addr, int32 $addrlen) returns int32 is native is error-model<errno> is export(:bind) {...}
 
-sub _bind(sockfd $sockfd, sockaddr $my-addr, int32 $addrlen) returns int32 is native is symbol('bind') is export(:_bind) {...}
+sub listen(sockfd $sockfd, int32 $backlog) returns int32 is native is error-model<errno> is export(:listen) {...}
 
-sub listen(|c) returns Bool is export(:listen) {
-  my int32 $result = _listen(|c);
-  return $result < 0
-  ?? do {
-    my $failure = fail errno.symbol;
-    set_errno(0);
-    $failure;
-  }
-  !! True;
-}
+sub getpeername(sockfd, sockaddr $address, int32 is rw) returns int32 is native is error-model<errno> is export(:getpeername) { ... }
 
-sub _listen(sockfd $sockfd, int32 $backlog) returns int32 is native is symbol('listen') is export(:_listen) {...}
-
-sub getpeername(|c) returns int32 is export(:getpeername) {
-  my int32 $result = _getpeername(|c);
-  return $result < 0
-  ?? do {
-    my $failure = fail errno.symbol;
-    set_errno(0);
-    $failure;
-  }
-  !! $result;
-}
-
-sub _getpeername(sockfd, sockaddr $address, int32 is rw) returns int32 is native is symbol('getpeername') is export(:_getpeername) { ... }
-
-sub getsockname(|c) returns int32 is export(:getsockname) {
-  my int32 $result = _getsockname(|c);
-  return $result < 0
-  ?? do {
-    my $failure = fail errno.symbol;
-    set_errno(0);
-    $failure;
-  }
-  !! $result;
-}
-
-sub _getsockname(sockfd, sockaddr, int32 is rw) returns int32 is native is symbol('getsockname') is export(:_getsockname) { ... }
+sub getsockname(sockfd, sockaddr, int32 is rw) returns int32 is native is error-model<errno> is export(:getsockname) { ... }
 
 =begin pod
 
@@ -779,12 +687,6 @@ sub _getsockname(sockfd, sockaddr, int32 is rw) returns int32 is native is symbo
 inet-pton(int32, Str, Pointer[void]) returns int32
 
 inet-ntop(int32, Pointer[void], Pointer[uint8], int32) returns Str
-
-All of the functions below are wrapped by default. If something goes wrong, the
-function will return a Failure containing C<errno.symbol> *see Unix::errno*
-
-To use the unwrapped version, put an underscore before the function name:
-e.g. C<_bind>
 
 setsockopt(socket $sockfd, int32 $level, int32 $optname, Pointer[void], uint32 $optlen) returns int32
 
