@@ -172,22 +172,9 @@ role IO::URing::Socket is export {
     try $!close-vow.keep(True);
   }
 
-  method connect(IO::URing::Socket:U: Str $host, $port?, |c) {
-    with $port {
-      my $version = ip-get-version $host;
-      if $version == 4 {
-        require ::("IO::URing::Socket::INET");
-        return ::("IO::URing::Socket::INET").connect($host, $port, |c);
-      }
-      elsif $version == 6 {
-        require ::("IO::URing::Socket::INET");
-        return ::("IO::URing::Socket::INET").connect($host, $port, :ip6, |c);
-      }
-    }
-    else {
-      #IO::URing::Socket::UNIX.connect($host, |c);
-    }
-  }
+  #| Connect this socket to a peer.
+  #| See specific socket type for details.
+  method connect(IO::URing::Socket:U: Str $host, $port?, |c) { ... }
 
   method native-descriptor(--> Int) {
     $!socket;
@@ -200,22 +187,17 @@ role IO::URing::Socket is export {
     nqp::bindattr(socket, IO::URing::Socket, '$!close-vow', $p.vow);
   }
 
-  method listen(IO::URing::Socket:U: Str $host, $port?, |c) {
-    with $port {
-      my $version = ip-get-version $host;
-      if $version == 4 {
-        require ::("IO::URing::Socket::INET");
-        ::("IO::URing::Socket::INET").listen($host, $port, |c);
-      }
-      elsif $version == 6 {
-        require ::("IO::URing::Socket::INET");
-        ::("IO::URing::Socket::INET").listen($host, $port, :ip6, |c);
-      }
-    }
-    else {
-      #URing::Socket::UNIX.listen($host, |c);
-    }
-  }
+  #| Listen for incoming connections.
+  #| See specific socket type for details.
+  method listen(IO::URing::Socket:U: Str $host, $port?, |c) { ... }
+
+  #| Send a Str on a dgram socket.
+  #| See specific socket type for details.
+  method print-to(IO::URing::Socket:D: Str $host, $port?, Str $str) { ... }
+
+  #| Send a Blob on a dgram socket.
+  #| See specific socket type for details.
+  method write-to(IO::URing::Socket:D: Str $host, $port?, Blob $buf) { ... }
 
 #################################################
 #                SOL_SOCKET LEVEL               #
