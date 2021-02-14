@@ -274,7 +274,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!encoder',
               $encoding.encoder());
       setup-close($client_socket);
-      $client_socket.broadcast(True) if $broadcast;
+      $client_socket!broadcast(True) if $broadcast;
       $p.keep($client_socket);
     };
     await $p;
@@ -303,8 +303,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!encoder',
               $encoding.encoder());
       setup-close($client_socket);
-      $client_socket.reuseport(True) if $reuseport;
-      $client_socket.reuseaddr(True) if $reuseaddr;
+      $client_socket!reuseport(True) if $reuseport;
+      $client_socket!reuseaddr(True) if $reuseaddr;
       my $addr = $domain ~~ AF::INET6 ?? sockaddr_in6.new($host, $port) !! sockaddr_in.new($host, $port);
       bind($socket, $addr, $addr.size);
       $p.keep($client_socket);

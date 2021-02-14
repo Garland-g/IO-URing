@@ -221,7 +221,7 @@ role IO::URing::Socket is export {
 #                SOL_SOCKET LEVEL               #
 #################################################
 
-  multi method reuseaddr(IO::URing::Socket:D: Bool $reuseaddr --> Bool) {
+  method !reuseaddr(IO::URing::Socket:D: Bool $reuseaddr --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, $reuseaddr ?? 1 !! 0);
     setsockopt(
@@ -248,7 +248,7 @@ role IO::URing::Socket is export {
     $opt.read-uint32(0).Bool;
   }
 
-  multi method reuseport(IO::URing::Socket:D: Bool $reuseport --> Bool) {
+  method !reuseport(IO::URing::Socket:D: Bool $reuseport --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, $reuseport ?? 1 !! 0);
     setsockopt(
@@ -290,7 +290,7 @@ role IO::URing::Socket is export {
     $opt.read-uint32(0).Bool;
   }
 
- multi method bindtodevice(IO::URing::Socket:D: Str $device where .chars < 16 --> Bool) {
+ method !bindtodevice(IO::URing::Socket:D: Str $device where .chars < 16 --> Bool) {
     return Bool unless $!domain ~~ AF::INET | AF::INET6;
     my $opt = $device.encode('ascii');
     setsockopt(
@@ -316,7 +316,7 @@ role IO::URing::Socket is export {
     $opt.subbuf(0..$len.read-uint32(0)).decode('ascii')
   }
 
-  multi method broadcast(IO::URing::Socket:D: Bool $broadcast --> Bool) {
+  method !broadcast(IO::URing::Socket:D: Bool $broadcast --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, $broadcast ?? 1 !! 0);
     setsockopt(
@@ -373,7 +373,7 @@ role IO::URing::Socket is export {
     IPPROTO($opt.read-uint32(0));
   }
 
-  multi method dontroute(IO::URing::Socket:D: Bool $dontroute --> Bool) {
+  method !dontroute(IO::URing::Socket:D: Bool $dontroute --> Bool) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, $dontroute ?? 1 !! 0);
     setsockopt(

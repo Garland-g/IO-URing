@@ -203,7 +203,7 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!encoder',
               $encoding.encoder());
       setup-close($client_socket);
-      $client_socket.broadcast(True) if $broadcast;
+      $client_socket!broadcast(True) if $broadcast;
       $p.keep($client_socket);
     };
     await $p;
