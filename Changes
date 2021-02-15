@@ -1,4 +1,7 @@
 Revision history for io_uring
 
 {{$NEXT}}
+
+0.0.1  2021-02-14T16:48:48-08:00
     - Initial version
+    - Currently supports INET, INET6 and UNIX sockets
