@@ -32,8 +32,10 @@ $ring.close; # free the ring
 
 =head1 DESCRIPTION
 
-IO::URing is a binding to the new io_uring interface in the Linux kernel. As such,
-it will only work on Linux.
+IO::URing is a binding to the new io_uring interface in the Linux kernel.
+
+It will only work on Linux 5.1 and above. Use with 5.6 or above for best results.
+See the io_uring documentation for which operations are supported on your kernel version.
 
 See the included IO::URing::Socket libraries for an example of IO::URing in action.
 
