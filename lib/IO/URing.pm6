@@ -649,8 +649,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.submit(self.prep-connect($fd, $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
-  multi method prep-send($fd, Str $str,  |c --> Submission) {
-    self.prep-send($fd.native-descriptor, $str, |c);
+  multi method prep-send($fd, |c --> Submission) {
+    self.prep-send($fd.native-descriptor, |c);
   }
 
   multi method prep-send(Int $fd, Str $str, :$enc = 'utf-8', |c --> Submission) {
@@ -674,8 +674,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                           )
   }
 
-  multi method send($fd, $buf, Int $flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
-    self.submit(self.prep-send($fd, $buf, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
+  multi method send($fd, $buf, Int $flags = 0, :$enc = 'utf-8', :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    self.submit(self.prep-send($fd, $buf, $flags, :$enc, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
   multi method prep-recv($fd, |c --> Submission) {
