@@ -35,7 +35,7 @@
   "resources": [
     "libraries/uringhelper"
   ],
-  "source-url": "",
+  "source-url": "https://github.com/Garland-g/IO-URing.git",
   "tags": [
   ],
   "test-depends": [
