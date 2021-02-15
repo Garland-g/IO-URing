@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/travis/IO-URing.svg?branch=master)](https://travis-ci.org/travis/IO-URing)
+[![Build Status](https://travis-ci.org/Garland-g/IO-URing.svg?branch=master)](https://travis-ci.org/Garland-g/IO-URing)
 
 NAME
 ====

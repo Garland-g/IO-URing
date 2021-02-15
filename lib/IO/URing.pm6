@@ -46,7 +46,7 @@ This code uses liburing to set up and submit requests to the ring.
 
 =end pod
 
-class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
+class IO::URing:ver<0.0.2>:auth<cpan:GARLANDG> {
   my enum STORAGE <EMPTY>;
 
   #| A Completion is returned from an awaited Handle.
