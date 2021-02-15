@@ -416,7 +416,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
 #################################################
 
   #| Join a multicast group using an ip_mreqn struct.
-  multi method add-ip-membership(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool) {
+  multi method add-ip-membership(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool(Int)) {
     setsockopt(
       $!socket,
       $!ipproto,
@@ -432,7 +432,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   }
 
   #| Leave a multicast group using an ip_mreqn struct.
-  multi method drop-ip-membership(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool) {
+  multi method drop-ip-membership(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool(Int)) {
     setsockopt(
       $!socket,
       $!ipproto,
@@ -448,7 +448,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   }
 
   #| Enable or disable multicast loopback on a socket.
-  multi method multicast-loopback(IO::URing::Socket::INET:D: Bool $loopback --> Bool) {
+  multi method multicast-loopback(IO::URing::Socket::INET:D: Bool $loopback --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint8(0, $loopback ?? 1 !! 0);
     setsockopt(
@@ -485,18 +485,18 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   }
 
   #| Set the interface to send multicast packets on using struct ip_mreqn.
-  multi method set-sending-interface(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool) {
+  multi method set-sending-interface(IO::URing::Socket::INET:D: ip_mreqn $ip-mreqn --> Bool(Int)) {
     setsockopt(
       $!socket,
       $!ipproto,
       $!domain ~~ AF::INET ?? IP::MULTICAST_IF !! IPV6::MULTICAST_IF,
       nativecast(Pointer[void], $ip-mreqn),
       nativesizeof($ip-mreqn)
-    ).Bool;
+    );
   }
 
   #| Set the unicast hop limit.
-  multi method ttl(IO::URing::Socket::INET:D: Int $ttl --> Bool) {
+  multi method ttl(IO::URing::Socket::INET:D: Int $ttl --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-int32(0, $ttl);
     setsockopt(
@@ -525,7 +525,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   }
 
   #| Set the multicast hop limit.
-  multi method multicast-hops(IO::URing::Socket::INET:D: Int $ttl --> Bool) {
+  multi method multicast-hops(IO::URing::Socket::INET:D: Int $ttl --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-int32(0, $ttl);
     setsockopt(

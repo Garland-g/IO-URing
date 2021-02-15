@@ -268,7 +268,7 @@ role IO::URing::Socket is export {
 #                SOL_SOCKET LEVEL               #
 #################################################
 
-  method !reuseaddr(IO::URing::Socket:D: Bool $reuseaddr --> Bool) {
+  method !reuseaddr(IO::URing::Socket:D: Bool $reuseaddr --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, $reuseaddr ?? 1 !! 0);
     setsockopt(
@@ -283,7 +283,7 @@ role IO::URing::Socket is export {
   #| Get the current value of SO_REUSEADDR.
   #| SO_REUSEADDR allows re-binding to the socket without
   #| waiting for the TIME_WAIT period.
-  method reuseaddr(IO::URing::Socket:D: --> Bool) {
+  method reuseaddr(IO::URing::Socket:D: --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
     my buf8 $len .= new;
@@ -298,7 +298,7 @@ role IO::URing::Socket is export {
     $opt.read-uint32(0).Bool;
   }
 
-  method !reuseport(IO::URing::Socket:D: Bool $reuseport --> Bool) {
+  method !reuseport(IO::URing::Socket:D: Bool $reuseport --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, $reuseport ?? 1 !! 0);
     setsockopt(
@@ -312,7 +312,7 @@ role IO::URing::Socket is export {
 
   #| Get the current value of SO_REUSEPORT.
   #| SO_REUSEPORT allows multiple sockets to bind to the same port.
-  method reuseport(IO::URing::Socket:D: --> Bool) {
+  method reuseport(IO::URing::Socket:D: --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
     my buf8 $len .= new;
@@ -329,7 +329,7 @@ role IO::URing::Socket is export {
 
   #| Get the current value of SO_ACCEPTCONN.
   #| SO_ACCEPTCONN returns true if the socket is listening.
-  method acceptconn(IO::URing::Socket:D: --> Bool) {
+  method acceptconn(IO::URing::Socket:D: --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
     my buf8 $len .= new;
@@ -344,7 +344,7 @@ role IO::URing::Socket is export {
     $opt.read-uint32(0).Bool;
   }
 
- method !bindtodevice(IO::URing::Socket:D: Str $device where .chars < 16 --> Bool) {
+ method !bindtodevice(IO::URing::Socket:D: Str $device where .chars < 16 --> Bool(Int)) {
     return Bool unless $!domain ~~ AF::INET | AF::INET6;
     my $opt = $device.encode('ascii');
     setsockopt(
@@ -373,7 +373,7 @@ role IO::URing::Socket is export {
     $opt.subbuf(0..$len.read-uint32(0)).decode('ascii')
   }
 
-  method !broadcast(IO::URing::Socket:D: Bool $broadcast --> Bool) {
+  method !broadcast(IO::URing::Socket:D: Bool $broadcast --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, $broadcast ?? 1 !! 0);
     setsockopt(
@@ -388,7 +388,7 @@ role IO::URing::Socket is export {
   #| Get the current value of SO_BROADCAST on the socket.
   #| SO_BROADCAST determines whether or not the socket can
   #| send messages to the broadcast address.
-  multi method broadcast(IO::URing::Socket:D: --> Bool) {
+  multi method broadcast(IO::URing::Socket:D: --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
     my buf8 $len .= new;
@@ -435,7 +435,7 @@ role IO::URing::Socket is export {
     IPPROTO($opt.read-uint32(0));
   }
 
-  method !dontroute(IO::URing::Socket:D: Bool $dontroute --> Bool) {
+  method !dontroute(IO::URing::Socket:D: Bool $dontroute --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, $dontroute ?? 1 !! 0);
     setsockopt(
@@ -450,7 +450,7 @@ role IO::URing::Socket is export {
   #| Get the current value of SO_DONTROUTE.
   #| SO_DONTROUTE determines whether or not to bypass the routing
   #| table and send messages to the network interface directly.
-  method dontroute(IO::URing::Socket:D: --> Bool) {
+  method dontroute(IO::URing::Socket:D: --> Bool(Int)) {
     my buf8 $opt .= new;
     $opt.write-uint32(0, 0);
     my buf8 $len .= new;
