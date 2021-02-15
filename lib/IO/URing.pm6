@@ -5,28 +5,85 @@ use Universal::errno::Constants;
 
 use NativeCall;
 
+=begin pod
+
+=head1 NAME
+
+IO::URing - Access the io_uring interface from Raku
+
+=head1 SYNOPSIS
+
+Sample NOP call
+
+=begin code :lang<raku>
+
+use IO::URing;
+
+my IO::URing $ring .= new(:8entries, :0flags);
+my $data = await $ring.nop(1);
+# or
+react whenever $ring.nop(1) -> $data {
+    say "data: {$data.raku}";
+  }
+}
+$ring.close; # free the ring
+
+=end code
+
+=head1 DESCRIPTION
+
+IO::URing is a binding to the new io_uring interface in the Linux kernel. As such,
+it will only work on Linux.
+
+See the included IO::URing::Socket libraries for an example of IO::URing in action.
+
+Some knowledge of io_uring and liburing is a pre-requisite for using this library.
+This code uses liburing to set up and submit requests to the ring.
+
+=head1 IO::URing internal classes
+
+=end pod
+
 class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
   my enum STORAGE <EMPTY>;
 
+  #| A Completion is returned from an awaited Handle.
+  #| The completion contains the result of the operation.
   my class Completion {
+    #| The user data passed into the Submission.
     has $.data;
+    #| The request passed into the IO::URing.
     has io_uring_sqe $.request;
+    #| The result of the operation.
     has int $.result;
     has int $.flags;
   }
 
+  #| A Handle is a Promise that can be used to cancel an IO::URing operation.
+  #| Every call to submit or any non-prep operation will return a Handle.
   my class Handle is Promise {
     trusts IO::URing;
     has Int $!slot;
     method !slot(--> Int) is rw { $!slot }
   }
 
+  #| A Submission holds a request for an operation.
+  #| Every call to a "prep" method will return a Submission.
+  #| A Submission can be passed into the submit method.
   my class Submission {
     has io_uring_sqe $.sqe is rw;
     has $.addr;
     has $.data;
     has &.then;
   }
+
+=begin pod
+
+=head1 IO::URing
+
+=head2 IO::URing methods
+
+=end pod
 
   my \tweak-flags = IORING_SETUP_CLAMP;
 
@@ -189,11 +246,13 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     }
   }
 
+  #| Close the IO::URing object and shut down event processing.
   method close() {
     eventfd_write($!eventfd, $!entries + 1);
     await $!close-promise;
   }
 
+  #| Get the enabled features on this IO::URing.
   method features() {
     do for IORING_FEAT.enums { .key if $!params.features +& .value }
   }
@@ -238,6 +297,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.submit(@submissions);
   }
 
+  #| Submit multiple Submissions to the IO::URing. A slurpy variant is provided.
+  #| Returns an Array of Handles.
   multi method submit(@submissions --> Array[Handle]) {
     my Handle $handles-promise .= new;
     $!queue.send($handles-promise.vow => @submissions);
@@ -245,6 +306,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $handles-promise.result;
   }
 
+  #| Submit a single Submission to the IO::URing.
+  #| Returns a Handle.
   multi method submit(Submission $sub --> Handle) {
     my Handle $handle-promise .= new;
     $!queue.send($handle-promise.vow => $sub);
@@ -261,6 +324,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     $flags;
   }
 
+  #| Prepare a no-op operation.
   method prep-nop(:$data, :$ioprio = 0, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -275,6 +339,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                          :$data);
   }
 
+  #| Prepare and submit a no-op operation.
   method nop(|c --> Handle) {
     self.submit(self.prep-nop(|c));
   }
@@ -288,6 +353,9 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-readv($fd, @bufs, :$offset, :$ioprio, :$data, :$drain, :$link, :$hard-link, :$force-async);
   }
 
+  #| Prepare a readv operation.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
+  #| A multi with a @bufs slurpy is provided.
   multi method prep-readv(Int $fd, @bufs, Int :$offset = 0, :$data,
                           Int :$ioprio = 0, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     self!prep-readv($fd, to-read-bufs(@bufs), :$offset, :$data, :$ioprio, :$drain, :$link, :$hard-link, :$force-async);
@@ -327,6 +395,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                          );
   }
 
+  #| Prepare and submit a readv operation.
+  #| See prep-readv for details.
   method readv(|c --> Handle) {
     self.submit(self.prep-readv(|c));
   }
@@ -339,6 +409,9 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-writev($fd, @bufs, :$offset, :$data, :$enc, :$drain, :$link, :$hard-link, :$force-async);
   }
 
+  #| Prepare a writev operation.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
+  #| A multi with a @bufs slurpy is provided.
   multi method prep-writev(Int $fd, @bufs, Int :$offset = 0, Int :$ioprio = 0, :$data, :$enc = 'utf-8', :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     self!prep-writev($fd, to-write-bufs(@bufs, :$enc), :$offset, :$ioprio, :$data, :$link);
   }
@@ -376,6 +449,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                          );
   }
 
+  #| Prepare and submit a writev operation.
+  #| See prep-writev for details.
   method writev(|c --> Handle) {
     self.submit(self.prep-writev(|c));
   }
@@ -413,6 +488,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-poll-add($fd.native-descriptor, |c)
   }
 
+  #| Prepare a poll-add operation.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-poll-add(Int $fd, UInt $poll-mask, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -430,10 +507,14 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                          );
   }
 
+  #| Prepare and submit a poll-add operation.
+  #| See prep-poll-add for details.
   method poll-add($fd, UInt $poll-mask, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-poll-add($fd, $poll-mask, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
+  #| Prepare a poll-remove operation.
+  #| The provided Handle must be the Handle returned by the poll-add operation that should be cancelled.
   method prep-poll-remove(Handle $slot, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -450,13 +531,15 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                           );
   }
 
+  #| Prepare and submit a poll-remove operation.
   method poll-remove(Handle $slot, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-poll-remove($slot, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
   #| Prepare a sendto operation.
+  #| This is a wrapper around the sendmsg call for ease of use.
   #| A multi is provided that takes Blobs.
-  #| A multi will handle a non-Int $fd by calling native-descriptor
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-sendto(Int $fd, Str $str, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async, :$enc = 'utf-8' --> Submission) {
     self.prep-sendto($fd, $str.encode($enc), $union-flags, $addr, $len, :$data, :$drain, :$link, :$hard-link, :$force-async);
   }
@@ -480,6 +563,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     samewith($fd.native-descriptor, |c);
   }
 
+  #| Prepare and submit a sendto operation
   multi method sendto($fd, Blob $blob, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle ) {
     self.submit(self.prep-sendto($fd, $blob, $union-flags, $addr, $len, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
@@ -488,6 +572,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     samewith($fd.native-descriptor, |c);
   }
 
+  #| Prepare a sendmsg operation.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-sendmsg(Int $fd, msghdr:D $msg, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -505,6 +591,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                           )
   }
 
+  #| Prepare and submit a sendmsg operation.
   method sendmsg($fd, msghdr:D $msg, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-sendmsg($fd, $msg, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
@@ -513,6 +600,10 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-recvfrom($fd.native-descriptor, |c);
   }
 
+  #| Prepare a recvfrom operation.
+  #| This is a wrapper around the recvmsg call for ease of use.
+  #| A multi is provided that takes Blobs.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-recvfrom(Int $fd, Blob $buf, $flags, Blob $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my msghdr $msg .= new;
     $msg.msg_controllen = 0;
@@ -524,6 +615,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-recvmsg($fd, $msg, $flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async);
   }
 
+  #| Prepare and submit a recvfrom operation.
   method recvfrom($fd, Blob $buf, $flags, Blob $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-recvfrom($fd, $buf, $flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
@@ -532,6 +624,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-recvmsg($fd.native-descriptor, $msg, $union-flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async);
   }
 
+  #| Prepare a recvmsg operation.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-recvmsg(Int $fd, msghdr:D $msg is rw, $union-flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -553,10 +647,14 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     samewith($fd.native-descriptor, |c);
   }
 
+  #| Prepare and submit a recvmsg operation
   multi method recvmsg(Int $fd, msghdr:D $msg is rw, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-recvmsg($fd, $msg, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
+  #| Prepare a cancel operation to cancel a previously submitted operation.
+  #| Note that this chases an in-flight operation, meaning it may or maybe not be successful in cancelling the operation.
+  #| This means that both cases must be handled.
   method prep-cancel(Handle $slot, UInt $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -591,6 +689,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
               )
   }
 
+  #| Prepare and submit a cancel operation
   method cancel(Handle $slot, UInt :$flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
       self.submit(self.prep-cancel($slot, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
@@ -603,6 +702,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-accept($fd.native-descriptor, |c);
   }
 
+  #| Prepare an accept operation.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-accept(Int $fd, $sockaddr?, Int $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -620,6 +721,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                           )
   }
 
+  #| Prepare and submit an accept operation.
   method accept($fd, $sockaddr?, Int $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-accept($fd, $sockaddr // Pointer));
   }
@@ -628,6 +730,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-connect($fd.native-descriptor, |c);
   }
 
+  #| Prepare a connect operation.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-connect(Int $fd, sockaddr_role $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -645,6 +749,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                           )
   }
 
+  #| Prepare and submit a connect operation.
   method connect($fd, sockaddr_role $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-connect($fd, $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
@@ -657,6 +762,9 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-send($fd, $str.encode($enc), |c);
   }
 
+  #| Prepare a send operation.
+  #| A multi will handle a Str submission., which takes a named parameter :$enc = 'utf-8'.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-send(Int $fd, Blob $buf, $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -674,6 +782,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                           )
   }
 
+  #| Prepare and submit a send operation.
   multi method send($fd, $buf, Int $flags = 0, :$enc = 'utf-8', :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-send($fd, $buf, $flags, :$enc, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
@@ -682,6 +791,8 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     self.prep-recv($fd.native-descriptor, |c);
   }
 
+  #| Prepare a recv operation.
+  #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-recv(Int $fd, Blob $buf, Int $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
@@ -699,10 +810,13 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                           )
   }
 
+  #| Prepare and submit a recv operation.
   multi method recv($fd, Blob $buf, Int $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-recv($fd, $buf, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
+  #| Prepare a submit a close-fd operation.
+  #| This is a fake operation which will be used until linux kernels older than 5.6 are unsupported.
   method close-fd(IO::URing:D: Int $fd --> Handle) {
     self.submit(
       Submission.new(
@@ -711,8 +825,12 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
                       :data("close-fd"),
                      )
     )
+  # This method mitigates a race condition where a socket could be closed before any final send operation started.
+  # Once the send operation has started, close can be called safely, as the kernel will make sure the data is sent from the socket before it closes it.
+  #TODO: This should be replaced by IORING_OP_CLOSE once linux kernel 5.6 goes out of date.
   }
 
+  #| Get the supported operations on an IO::URing instance.
   multi method supported-ops(IO::URing:D: --> Hash) {
     return %!supported-ops // do {
       my $probe = io_uring_get_probe_ring($!ring);
@@ -722,6 +840,7 @@ class IO::URing:ver<0.0.1>:auth<cpan:GARLANDG> {
     }
   }
 
+  #| Get the supported operations without an IO::URing instance.
   multi method supported-ops(IO::URing:U: --> Hash) {
     my $probe = io_uring_get_probe();
     my %supported-ops = $probe.supported-ops();
@@ -739,33 +858,6 @@ sub EXPORT() {
 }
 
 =begin pod
-
-=head1 NAME
-
-IO::URing - Access the io_uring interface from Raku
-
-=head1 SYNOPSIS
-
-Sample NOP call
-
-=begin code :lang<raku>
-
-use IO::URing;
-
-my IO::URing $ring .= new(:8entries, :0flags);
-my $data = await $ring.nop(1);
-# or
-react whenever $ring.nop(1) -> $data {
-    say "data: {$data.raku}";
-  }
-}
-$ring.close; # free the ring
-
-=end code
-
-=head1 DESCRIPTION
-
-IO::URing is a binding to the new io_uring interface in the Linux kernel.
 
 =head1 AUTHOR
 
