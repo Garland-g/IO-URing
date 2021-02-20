@@ -67,6 +67,13 @@ It does the IO::URing::Socket role.
 =end pod
 
 class IO::URing::Socket::UNIX does IO::URing::Socket is export {
+
+  method new() {
+    die "Cannot directly instantiate an IO::URing::Socket::UNIX. Please use\n" ~
+        "IO::URing::Socket::UNIX.connect, IO::URing::Socket::UNIX.listen,\n" ~
+        "IO::URing::Socket::UNIX.dgram, or IO::URing::Socket;:UNIX.bind-dgram.";
+  }
+
   my class UNIX-Datagram {
     has str $.host;
     has $.data;

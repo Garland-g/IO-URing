@@ -66,6 +66,13 @@ IO::URing::Socket::INET is a drop-in replacement for IO::Socket::Async with extr
 =end pod
 
 class IO::URing::Socket::INET does IO::URing::Socket is export {
+
+  method new() {
+    die "Cannot directly instantiate an IO::URing::Socket::INET. Please use\n" ~
+        "IO::URing::Socket::INET.connect, IO::URing::Socket::INET.listen,\n" ~
+        "IO::URing::Socket::INET.udp, or IO::URing::Socket::INET.bind-udp.";
+  }
+
   my class INET-Datagram {
     has str $.host;
     has int $.port;

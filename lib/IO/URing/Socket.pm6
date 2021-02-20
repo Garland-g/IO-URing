@@ -83,8 +83,7 @@ role IO::URing::Socket is export {
 
   method new() {
     die "Cannot directly instantiate an IO::URing::Socket. Please use\n" ~
-        "IO::URing::Socket.connect, IO::URing::Socket.listen,\n" ~
-        "IO::URing::Socket.dgram, or IO::URing::Socket.bind-dgram.";
+        "a socket class that implements IO::URing::Socket instead."
   }
 
   #| Send a Str over the socket connection
