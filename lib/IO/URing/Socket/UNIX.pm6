@@ -102,8 +102,8 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
   #| Get the host of the local socket.
   method socket-host(--> Str) {
     $!socket-host //= do {
-      my int32 $len = sockaddr_in.size;
-      my sockaddr_in $sockaddr = nativecast(sockaddr_in, blob8.allocate($len, 0));
+      my int32 $len = sockaddr_un.size;
+      my sockaddr_un $sockaddr = nativecast(sockaddr_un, blob8.allocate($len, 0));
       getsockname($!socket, $sockaddr, $len);
       $sockaddr.addr.Str;
     }
@@ -112,8 +112,8 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
   #| Get the host of the peer socket.
   method peer-host(--> Str) {
     $!peer-host //= do {
-      my int32 $len = sockaddr_in.size;
-      my sockaddr_in $sockaddr = nativecast(sockaddr_in, blob8.allocate($len, 0));
+      my int32 $len = sockaddr_un.size;
+      my sockaddr_un $sockaddr = nativecast(sockaddr_un, blob8.allocate($len, 0));
       getpeername($!socket, $sockaddr, $len);
       $sockaddr.addr.Str;
     }
@@ -314,8 +314,8 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
   method write-to(IO::URing::Socket::UNIX:D: Str() $host, Blob $b, :$scheduler = $*SCHEDULER) {
     my $p = Promise.new;
     my $v = $p.vow;
-    my sockaddr_in $addr .= new($host);
-    $!ring.sendto($!socket, $b, 0, $addr, sockaddr_in.size).then: -> $cmp {
+    my sockaddr_un $addr .= new($host);
+    $!ring.sendto($!socket, $b, 0, $addr, sockaddr_un.size).then: -> $cmp {
       if $cmp ~~ Exception {
         $v.break(strerror($cmp));
       }
