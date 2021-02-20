@@ -15,11 +15,13 @@ IO::URing::Socket::INET - An INET-specific socket class on top of IO::URing::Soc
 
 =head1 SYNOPSIS
 
-Sample INET Socket usage
+This is a drop-in replacement for IO::Socket::Async. It supports more socket options than IO::Socket::Async. but it is slower than IO::Socket::Async and a recent linux kernel v5.6+. The upside is that it supports more socket options than IO::Socket::Async.
+
+Sample INET Socket usage, shamelessly stolen from the IO::Socket::Async documentation:
 
 =begin code :lang<raku>
 
-# Server
+# TCP Server
 use IO::URing::Socket::INET;
 
 react {
@@ -37,7 +39,7 @@ react {
   }
 }
 
-# Client
+# TCP Client
 
 use IO::URing::Socket::INET;
 
@@ -54,6 +56,27 @@ await IO::URing::Socket::INET.connect('127.0.0.1', 3333).then( -> $promise {
     $conn.close;
   }
 });
+
+# UDP Server
+
+use IO::URing::Socket::INET;
+
+my $socket = IO::URing::Socket::INET.bind-udp('localhost', 3333);
+
+react {
+  whenever $socket.Supply -> $v {
+    if $v.chars > 0 {
+      say $v;
+    }
+  }
+}
+
+# UDP client
+
+use IO::URing::Socket::INET;
+
+my $socket = IO::URing::Socket::INET.udp();
+await $socket.print-to('localhost', 3333, "Hello, Raku!");
 
 =end code
 
