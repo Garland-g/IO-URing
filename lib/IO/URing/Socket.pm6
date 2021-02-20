@@ -207,7 +207,7 @@ role IO::URing::Socket is export {
   }
 
   #| Get a Supply for the socket. Will emit values whenever a message is received.
-  multi method Supply(IO::URing::Socket:D: :$bin, :$datagram, :$enc = 'utf-8', :$scheduler = $*SCHEDULER) {
+  method Supply(IO::URing::Socket:D: :$bin, :$datagram, :$enc = 'utf-8', :$scheduler = $*SCHEDULER) {
     my $dgram = $datagram ?? $!datagram !! Any;
     if $bin {
       Supply.new: SocketReaderTappable.new:
