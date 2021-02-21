@@ -1,0 +1,77 @@
+use v6.c;
+use Test;
+use IO::URing::Socket::Raw :ALL;
+
+plan 2;
+
+subtest {
+  plan 4;
+  subtest {
+    plan 2;
+    my Int $test = 3791716609;
+    my buf8 $buf .= new;
+    my in_addr $addr .= new(:addr('226.1.1.1'));
+    is $addr.Str, '226.1.1.1', <convert to Str>;
+    $buf.write-uint32(0, $addr.raw, NativeEndian);
+    is $buf.read-uint32(0, BigEndian), $test, <convert to integer value>;
+  }, <Multicast Address from Str>;
+
+  subtest {
+    plan 2;
+    my $test = 3232235767; #192.168.0.247
+    my buf8 $buf .= new;
+    my in_addr $addr .= new(:addr('192.168.0.247'));
+    is $addr.Str, '192.168.0.247', <convert to Str>;
+    $buf.write-uint32(0, $addr.raw, NativeEndian);
+    is $buf.read-uint32(0, BigEndian), $test, <convert to integer value>
+  }, <Local Address from Str>;
+
+  subtest {
+    plan 2;
+    my buf8 $buf .= new;
+    my Int $test = 3232235767;
+    $buf.write-uint32(0, $test, BigEndian);
+    my in_addr $addr .= new(:s-addr($buf.read-uint32(0, NativeEndian)));
+    $buf.write-uint32(0, $addr.raw, NativeEndian);
+    is $buf.read-uint32(0, BigEndian), $test, <convert to integer value>;
+    is $addr.Str, '192.168.0.247', <convert to Str>;
+  }, <Local Address from Int>;
+
+  subtest {
+    plan 2;
+    my buf8 $buf .= new;
+    my Int $test = 0;
+    my in_addr $addr .= new(:addr('0.0.0.0'));
+    is $addr.Str, '0.0.0.0', <convert to Str>;
+    $buf.write-uint32(0, $addr.raw, NativeEndian);
+    is $buf.read-uint32(0, BigEndian), $test, <convert to integer value>;
+  }, <IFADDR_ANY>;
+}, <IPV4 Tests>;
+
+subtest {
+  plan 3;
+  subtest {
+    plan 2;
+    my in6_addr $addr .= new(:addr('::1'));
+    is $addr.Str, '::1', <convert to Str>;
+    is $addr.raw, <0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1>, <convert to integer value>;
+  }, <Abbreviated Address from Str>;
+
+  subtest {
+    plan 2;
+    my in6_addr $addr .= new(:addr('2001:db8:85a3:8d3:1319:8a2e:370:7348'));
+    is $addr.Str, '2001:db8:85a3:8d3:1319:8a2e:370:7348', <convert to Str>;
+    is $addr.raw, <32 1 13 184 133 163 8 211 19 25 138 46 3 112 115 72>, <convert to integer value>
+  }, <Full Address from Str>;
+
+  subtest {
+    plan 2;
+    my in6_addr $addr .= new(:addr('2001:db8:85a3:8d3:1319:8a2e:370:7348'));
+    $addr[15] = 1;
+    is $addr.Str, '2001:db8:85a3:8d3:1319:8a2e:370:7301', <set byte with AT-POS>;
+    is $addr.raw, <32 1 13 184 133 163 8 211 19 25 138 46 3 112 115 1>, <convert to integer value>;
+  }, <Modify individual bytes>;
+}, <IPV6 Tests>;
+
+done-testing;
+# vi:syntax=perl6

@@ -1,0 +1,66 @@
+use v6.c;
+use Test;
+use IO::URing::Socket::Raw :ALL;
+use NativeCall;
+use Constants::Sys::Socket :AF;
+
+plan *;
+
+subtest {
+  my buf8 $buf .= new;
+
+  #sockaddr_in struct
+  $buf.write-int16(0, AF::INET, LittleEndian); # Family
+  $buf.write-uint16(2, 0, BigEndian);          # Port
+  $buf.write-uint32(4, 3232235521, BigEndian); # Address
+
+  my $addr = nativecast(sockaddr, $buf).sockaddr_in;
+  ok $addr.family ~~ AF::INET, <Family>;
+  ok $addr.port ~~ 0, <Port>;
+  ok $addr.addr.Str ~~ '192.168.0.1', <IP Address>;
+}, <sockaddr_in>;
+
+subtest {
+  my buf8 $buf .= new;
+  $buf.write-int16(0, AF::INET, LittleEndian); # Family
+  $buf.write-uint16(2, 3333, BigEndian);       # Port
+  $buf.write-uint32(4, 0x7F000001, BigEndian); # Address
+
+  my $addr = sockaddr_in.new('127.0.0.1', 3333);
+  my $casted = nativecast(sockaddr_in, $buf);
+
+  is $addr.family, $casted.family, <Family attribute>;
+  is $addr.port, $casted.port, <Port attribute>;
+  is $addr.addr, $casted.addr, <Addr attribute>;
+  is $addr.Str, $casted.Str, <Full string>;
+
+}, <sockaddr_in>;
+
+subtest {
+  my buf8 $buf .= new;
+
+  #sockaddr_in6 struct
+  $buf.write-int16(0, AF::INET6, LittleEndian); # Family
+  $buf.write-uint16(2, 0, BigEndian);           # Port
+  $buf.write-uint32(4, 5, BigEndian);           # Flowinfo
+  $buf.write-uint128(8, 42541956123769884636017138956568135816, BigEndian); # Address
+  $buf.write-uint32(24, 0);
+
+  my $addr = nativecast(sockaddr, $buf).sockaddr_in6;
+  ok $addr.family ~~ AF::INET6, <Family>;
+  ok $addr.port ~~ 0, <Port>;
+  ok $addr.flowinfo ~~ 83886080, <Flowinfo>;
+  ok $addr.addr.Str ~~ '2001:4860:4860::8888', <IP Address>;
+  ok $addr.scope-id ~~ 0, <Scope ID>;
+}, <sockaddr_in6>;
+
+subtest {
+  my $addr = sockaddr_in6.new(:addr("::1"), :port(3333));
+  ok $addr.family ~~ AF::INET6, <Family>;
+  ok $addr.port ~~ 3333, <Port>;
+  ok $addr.flowinfo ~~ 0, <Flowinfo>;
+  ok $addr.scope-id ~~ 0, <Scope ID>;
+  ok $addr.addr.Str ~~ '::1', <IP Address>;
+}, <sockaddr_in6>;
+
+done-testing;

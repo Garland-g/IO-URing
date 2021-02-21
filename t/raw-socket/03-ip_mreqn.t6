@@ -1,0 +1,19 @@
+use v6.c;
+use Test;
+use NativeCall;
+use IO::URing::Socket::Raw :ALL;
+
+plan *;
+
+my ip_mreqn $req .= new(:multi-addr('226.1.1.1'), :address('192.168.0.1'), :12ifindex);
+is $req.imr-multiaddr.Str, '226.1.1.1', <multiaddr value>;
+is $req.imr-address.Str, '192.168.0.1', <address value>;
+is $req.imr-ifindex, 12, <ifindex value>;
+
+my buf8 $buf .= new(0xE2, 1, 1, 1, 0xC0, 0xA8, 0, 1, 0x0C, 0, 0, 0);
+my $packed = nativecast(ip_mreqn, $buf);
+
+is-deeply $req, $packed, <Manual-packing>;
+
+done-testing;
+# vi:syntax=perl6
