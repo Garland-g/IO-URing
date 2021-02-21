@@ -586,7 +586,7 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
                             :$fd,
                             :off(0),
                             :$union-flags,
-                            :len(1),
+                            :len($msg.msg_iovlen),
                           ),
                           :addr($msg),
                           :$data
@@ -638,7 +638,7 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
                             :$fd,
                             :off(0),
                             :$union-flags,
-                            :len(1),
+                            :len($msg.msg_iovlen),
                           ),
                           :addr($msg),
                           :$data
