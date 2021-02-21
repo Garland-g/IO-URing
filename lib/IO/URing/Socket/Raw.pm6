@@ -251,7 +251,7 @@ class sockaddr_in is repr('CStruct') is export is rw {
     ntohs($!port) +& 0xFFFF;
   }
 
-  method addr(--> Str) {
+  method host(--> Str) {
     $!addr.Str;
   }
 
