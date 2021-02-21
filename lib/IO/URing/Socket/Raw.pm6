@@ -655,7 +655,7 @@ sub _inet-pton(int32, Str, Pointer[void]) returns int32 is native is error-model
 
 sub inet-ntop(|c) returns Str is export(:inet-ntop) {
   my $result = _inet-ntop(|c);
-  return Str if $result ~~ Str:D;
+  return $result if $result ~~ Str:D;
   my $failure = fail errno.symbol;
   set_errno(0);
   return $failure;
