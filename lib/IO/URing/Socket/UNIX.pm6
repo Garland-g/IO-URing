@@ -11,7 +11,7 @@ use nqp;
 
 =head1 NAME
 
-IO::URing::Socket::UNIX - A UNIX-specific socket class on top of IO::URing::Socket
+IO::URing::Socket::UNIX - An AF_UNIX/AF_LOCAL socket class on top of IO::URing::Socket
 
 =head1 SYNOPSIS
 
@@ -19,7 +19,7 @@ Sample UNIX Socket usage
 
 =begin code :lang<raku>
 
-# Server
+# SOCK_STREAM Server
 use IO::URing::Socket::UNIX;
 
 react {
@@ -41,7 +41,7 @@ react {
 }
 
 
-# Client
+# SOCK_STREAM Client
 use IO::URing::Socket::UNIX;
 await IO::URing::Socket::UNIX.connect("\0/tmp/test.socket").then( -> $promise {
   given $promise.result -> $conn {
@@ -54,6 +54,21 @@ await IO::URing::Socket::UNIX.connect("\0/tmp/test.socket").then( -> $promise {
     $conn.close;
   }
 });
+
+# SOCK_DGRAM Server
+use IO::URing::Socket::UNIX;
+my $socket = IO::URing::Socket::UNIX.bind-dgram("\0/tmp/test.socket");
+
+react whenever $socket.Supply(:datagram) -> $v {
+  if $v.data.chars > 0 {
+    say $v.data;
+  }
+}
+
+# SOCK_DGRAM Client
+use IO::URing::Socket::UNIX;
+my $socket = IO::URing::Socket::UNIX.dgram();
+$socket.print-to("\0/tmp/test.socket", "Hello, Raku!");
 
 =end code
 
