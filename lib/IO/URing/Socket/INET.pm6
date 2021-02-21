@@ -101,9 +101,9 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     has int $.port;
     has $.data;
 
-    method new(:$data, :$sockaddr, :$domain) {
+    method new(:$data, :$sockaddr, AF :$domain) {
       my $addr = $domain ~~ AF::INET6 ?? nativecast(sockaddr_in6, $sockaddr) !! nativecast(sockaddr_in, $sockaddr);
-      self.bless(:$data, :host($addr.addr), :port($addr.port));
+      self.bless(:$data, :host($addr.addr.Str), :port($addr.port));
     }
 
     method decode(|c) {

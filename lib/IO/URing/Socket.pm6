@@ -152,7 +152,7 @@ role IO::URing::Socket is export {
                       my \bytes = $cmp.result.result;
                       Any ~~ $!datagram
                         ?? emit($buffer.subbuf(^bytes))
-                        !! emit($!datagram.new(:data($buffer.subbuf(^bytes)), :$sockaddr));
+                        !! emit($!datagram.new(:data($buffer.subbuf(^bytes)), :$sockaddr, :$!domain));
                     }
                     else {
                     }
