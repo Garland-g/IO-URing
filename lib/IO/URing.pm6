@@ -538,8 +538,7 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
     self.submit(self.prep-poll-remove($slot, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
-  #| Prepare a sendto operation.
-  #| This is a wrapper around the sendmsg call for ease of use.
+  #| Prepare a sendmsg operation, mimicking sendto(2).
   #| A multi is provided that takes Blobs.
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-sendto(Int $fd, Str $str, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async, :$enc = 'utf-8' --> Submission) {
@@ -565,7 +564,7 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
     samewith($fd.native-descriptor, |c);
   }
 
-  #| Prepare and submit a sendto operation
+  #| Prepare and submit a sendmsg operation, mimicking sendto(2).
   multi method sendto($fd, Blob $blob, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle ) {
     self.submit(self.prep-sendto($fd, $blob, $union-flags, $addr, $len, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
@@ -602,8 +601,7 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
     self.prep-recvfrom($fd.native-descriptor, |c);
   }
 
-  #| Prepare a recvfrom operation.
-  #| This is a wrapper around the recvmsg call for ease of use.
+  #| Prepare a recvmsg operation, mimicking recvfrom(2).
   #| A multi is provided that takes Blobs.
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-recvfrom(Int $fd, Blob $buf, $flags, Blob $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
@@ -614,21 +612,21 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
     $msg.msg_iovlen = 1;
     $msg.msg_iov[0] = +nativecast(Pointer, $buf);
     $msg.msg_iov[1] = $buf.bytes;
-    self.prep-recvmsg($fd, $msg, $flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async);
+    self.prep-recvmsg($fd, $msg, $flags, :$data, :$drain, :$link, :$hard-link, :$force-async);
   }
 
-  #| Prepare and submit a recvfrom operation.
+  #| Prepare and submit a recvmsg operation, mimicking recvfrom(2).
   method recvfrom($fd, Blob $buf, $flags, Blob $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     self.submit(self.prep-recvfrom($fd, $buf, $flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async));
   }
 
-  multi method prep-recvmsg($fd, msghdr:D $msg is rw, $union-flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
-    self.prep-recvmsg($fd.native-descriptor, $msg, $union-flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  multi method prep-recvmsg($fd, msghdr:D $msg is rw, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+    self.prep-recvmsg($fd.native-descriptor, $msg, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async);
   }
 
   #| Prepare a recvmsg operation.
   #| A multi will handle a non-Int $fd by calling native-descriptor.
-  multi method prep-recvmsg(Int $fd, msghdr:D $msg is rw, $union-flags, $addr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
+  multi method prep-recvmsg(Int $fd, msghdr:D $msg is rw, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Submission) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     return Submission.new(
                           :sqe(io_uring_sqe.new:
