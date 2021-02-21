@@ -80,7 +80,7 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
 
     method new(:$data, :$sockaddr) {
       my $addr = nativecast(sockaddr_un, $sockaddr);
-      self.bless(:$data, :host($addr.addr));
+      self.bless(:$data, :host($addr.Str));
     }
 
     method decode(|c) {
