@@ -1,7 +1,10 @@
 use v6;
 use IO::URing::Raw;
 use IO::URing::Socket::Raw :ALL;
+use IO::URing::LogTimelineSchema;
 use Universal::errno::Constants;
+
+use Log::Timeline;
 
 use NativeCall;
 
@@ -115,7 +118,9 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
     $!ring = io_uring.new(:$!entries, :$!params);
     $!eventfd = eventfd(1, 0);
     start {
-        self!arm();
+        IO::URing::LogTimelineSchema::Arm.log: -> {
+          self!arm();
+        }
         io_uring_submit($!ring);
         my Pointer[io_uring_cqe] $cqe_ptr .= new;
         my $vow;
@@ -149,9 +154,13 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
               self!close();
               last;
             }
-            self!empty-queue();
-            self!arm();
-            io_uring_submit($!ring);
+            IO::URing::LogTimelineSchema::Submit.log: -> {
+              self!empty-queue();
+              IO::URing::LogTimelineSchema::Arm.log: -> {
+                self!arm();
+              }
+              io_uring_submit($!ring);
+            }
           }
         }
         else {
@@ -280,8 +289,9 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
 
   method !store($vow, io_uring_sqe $sqe, $user_data --> Int) {
     my size_t $ptr = +malloc(1);
+    my $started-task = opcode-to-operation(0xFFFF +& $sqe.opcode).start;
     $!storage-lock.protect: {
-      %!storage{$ptr} = ($vow, $sqe, $user_data);
+      %!storage{$ptr} = ($vow, $sqe, $user_data, $started-task);
     };
     $ptr;
   }
@@ -291,6 +301,7 @@ class IO::URing:ver<0.0.3>:auth<cpan:GARLANDG> {
     $!storage-lock.protect: {
       $tmp = %!storage{$slot}:delete;
     };
+    $tmp[*-1].end;
     free(Pointer.new($slot));
     return $tmp;
   }

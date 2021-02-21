@@ -17,6 +17,7 @@
   "depends": [
     "Constants::Netinet::In",
     "Constants::Sys::Socket",
+    "Log::Timeline",
     "NativeHelpers::iovec",
     "Universal::errno"
   ],
@@ -26,6 +27,7 @@
   "perl": "6.d",
   "provides": {
     "IO::URing": "lib/IO/URing.pm6",
+    "IO::URing::LogTimelineSchema": "lib/IO/URing/LogTimelineSchema.pm6",
     "IO::URing::Raw": "lib/IO/URing/Raw.pm6",
     "IO::URing::Socket": "lib/IO/URing/Socket.pm6",
     "IO::URing::Socket::INET": "lib/IO/URing/Socket/INET.pm6",
