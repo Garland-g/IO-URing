@@ -2,6 +2,15 @@ Revision history for io_uring
 
 {{$NEXT}}
 
+0.1.0  2021-02-21T15:53:59-08:00
+    - Better use of msghdr in sendmsg and recvmsg.
+    - Fix multiple issues with UNIX datagram sockets:
+        Datagram parameter for Supply
+        Incorrect sockaddr type sockaddr_in was changed to sockaddr_un in UNIX sockets.
+    - Add Log::Timeline support for IO::URing.
+    - Fix bugs in low-level socket code.
+    - Update documentation and method calls for recvmsg and sendto
+
 0.0.3  2021-02-15T11:20:28-08:00
     - Fix a bug where return types were not coerced properly.
 

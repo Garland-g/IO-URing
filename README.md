@@ -301,7 +301,7 @@ multi method prep-sendto(
 ) returns IO::URing::Submission
 ```
 
-Prepare a sendto operation. This is a wrapper around the sendmsg call for ease of use. A multi is provided that takes Blobs. A multi will handle a non-Int $fd by calling native-descriptor.
+Prepare a sendmsg operation, mimicking sendto(2). A multi is provided that takes Blobs. A multi will handle a non-Int $fd by calling native-descriptor.
 
 ### multi method sendto
 
@@ -320,7 +320,7 @@ multi method sendto(
 ) returns IO::URing::Handle
 ```
 
-Prepare and submit a sendto operation
+Prepare and submit a sendmsg operation, mimicking sendto(2).
 
 ### multi method prep-sendmsg
 
@@ -372,7 +372,7 @@ multi method prep-recvfrom(
 ) returns IO::URing::Submission
 ```
 
-Prepare a recvfrom operation. This is a wrapper around the recvmsg call for ease of use. A multi is provided that takes Blobs. A multi will handle a non-Int $fd by calling native-descriptor.
+Prepare a recvmsg operation, mimicking recvfrom(2). A multi is provided that takes Blobs. A multi will handle a non-Int $fd by calling native-descriptor.
 
 ### method recvfrom
 
@@ -390,7 +390,7 @@ method recvfrom(
 ) returns IO::URing::Handle
 ```
 
-Prepare and submit a recvfrom operation.
+Prepare and submit a recvmsg operation, mimicking recvfrom(2).
 
 ### multi method prep-recvmsg
 
@@ -399,7 +399,6 @@ multi method prep-recvmsg(
     Int $fd,
     msghdr:D $msg is rw,
     $union-flags,
-    $addr,
     :$data,
     :$drain,
     :$link,
