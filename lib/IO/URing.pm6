@@ -118,17 +118,19 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
     $!ring = io_uring.new(:$!entries, :$!params);
     $!eventfd = eventfd(1, 0);
     start {
+      IO::URing::LogTimelineSchema::Submit.log: -> {
         IO::URing::LogTimelineSchema::Arm.log: -> {
           self!arm();
         }
         io_uring_submit($!ring);
-        my Pointer[io_uring_cqe] $cqe_ptr .= new;
-        my $vow;
-        my int $result;
-        my int $flags;
-        my $data;
-        my $request;
-        my uint64 $jobs;
+      }
+      my Pointer[io_uring_cqe] $cqe_ptr .= new;
+      my $vow;
+      my int $result;
+      my int $flags;
+      my $data;
+      my $request;
+      my uint64 $jobs;
       loop {
         my $ret = io_uring_wait_cqe($!ring, $cqe_ptr);
         $!close-vow.break($ret.Exception) if $ret ~~ Failure; # Something has gone very wrong
