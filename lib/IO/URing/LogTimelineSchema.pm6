@@ -14,6 +14,8 @@ class Receive does Log::Timeline::Task['IO::URing', 'Submission', 'Receive'] {}
 
 class Arm does Log::Timeline::Task['IO::URing', 'Submission', 'Arm'] {}
 
+class MemCpy does Log::Timeline::Task['IO::URing', 'Submission', 'MemCpy'] {}
+
 module Op {
 
   class NoOp does Log::Timeline::Task['IO::URing', 'Operation', 'NoOp'] {}

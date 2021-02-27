@@ -206,7 +206,9 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
                 $sqe := io_uring_get_sqe($!ring);
             }
             $p.break("No more room in ring") unless $sqe.defined;
-            memcpy(nativecast(Pointer, $sqe), nativecast(Pointer, $sub.sqe), nativesizeof($sqe));
+            IO::URing::LogTimelineSchema::MemCpy.log: -> {
+              memcpy(nativecast(Pointer, $sqe), nativecast(Pointer, $sub.sqe), nativesizeof($sqe));
+            }
             with $sub.addr {
                 $sqe.addr = $sub.addr ~~ Int ?? $sub.addr !! +nativecast(Pointer, $_);
             }
@@ -382,12 +384,14 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
     my CArray[size_t] $iovecs .= new;
     my $pos = 0;
     my @iovecs;
-    for @bufs -> $buf {
-      my IOVec $iov .= new($buf);
-      $iovecs[$pos] = +$iov.Pointer;
-      $iovecs[$pos + 1] = $iov.elems;
-      @iovecs.push($iov);
-      $pos += 2;
+    IO::URing::LogTimelineSchema::MemCpy.log: -> {
+      for @bufs -> $buf {
+        my IOVec $iov .= new($buf);
+        $iovecs[$pos] = +$iov.Pointer;
+        $iovecs[$pos + 1] = $iov.elems;
+        @iovecs.push($iov);
+        $pos += 2;
+      }
     }
     return Submission.new(
                           :sqe(io_uring_sqe.new:
@@ -437,12 +441,14 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
     my CArray[size_t] $iovecs .= new;
     my @iovecs;
     my $pos = 0;
-    for @bufs -> $buf {
-      my IOVec $iov .= new($buf);
-      $iovecs[$pos] = +$iov.Pointer;
-      $iovecs[$pos + 1] = $iov.elems;
-      @iovecs.push($iov);
-      $pos += 2;
+    IO::URing::LogTimelineSchema::MemCpy.log: -> {
+      for @bufs -> $buf {
+        my IOVec $iov .= new($buf);
+        $iovecs[$pos] = +$iov.Pointer;
+        $iovecs[$pos + 1] = $iov.elems;
+        @iovecs.push($iov);
+        $pos += 2;
+      }
     }
     return Submission.new(
                           :sqe(io_uring_sqe.new:
