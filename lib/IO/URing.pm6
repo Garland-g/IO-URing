@@ -69,7 +69,9 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   my class Handle is Promise {
     trusts IO::URing;
     has Int $!slot;
-    method !slot(--> Int) is rw { $!slot }
+    method !slot(--> Int) is rw {
+      $!slot
+    }
   }
 
   #| A Submission holds a request for an operation.
@@ -133,7 +135,8 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
       my uint64 $jobs;
       loop {
         my $ret = io_uring_wait_cqe($!ring, $cqe_ptr);
-        $!close-vow.break($ret.Exception) if $ret ~~ Failure; # Something has gone very wrong
+        $!close-vow.break($ret.Exception) if $ret ~~ Failure;
+        # Something has gone very wrong
         if +$cqe_ptr != 0 {
           my io_uring_cqe $temp := $cqe_ptr.deref;
           if $temp.user_data {
@@ -142,7 +145,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
             $flags = $temp.flags;
             io_uring_cqe_seen($!ring, $cqe_ptr.deref);
             if $result < 0 {
-              $vow.keep(Failure.new("{IORING_OP($request.opcode)} returned result {Errno(-$result)}"));
+              $vow.keep(Failure.new("{ IORING_OP($request.opcode) } returned result { Errno(-$result) }"));
             }
             else {
               my $cmp = Completion.new(:$data, :$request, :$result, :$flags);
@@ -169,7 +172,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
           die "Got a NULL Pointer from the completion queue";
         }
       }
-        $!close-vow.keep(True);
+      $!close-vow.keep(True);
       CATCH {
         default {
           die $_;
@@ -202,25 +205,25 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
           with $sub.sqe {
             my $sqe := io_uring_get_sqe($!ring);
             without $sqe {
-                io_uring_submit($!ring);
-                $sqe := io_uring_get_sqe($!ring);
+              io_uring_submit($!ring);
+              $sqe := io_uring_get_sqe($!ring);
             }
             $p.break("No more room in ring") unless $sqe.defined;
             IO::URing::LogTimelineSchema::MemCpy.log: -> {
               memcpy(nativecast(Pointer, $sqe), nativecast(Pointer, $sub.sqe), nativesizeof($sqe));
             }
             with $sub.addr {
-                $sqe.addr = $sub.addr ~~ Int ?? $sub.addr !! +nativecast(Pointer, $_);
+              $sqe.addr = $sub.addr ~~ Int ?? $sub.addr !! +nativecast(Pointer, $_);
             }
             $sqe.user_data = self!store($p.vow, $sqe, $sub.data // Nil);
             with $sub.then {
-                my $promise = $p.then($sub.then);
-                $promise!Handle::slot = $sqe.user_data;
-                $promise
+              my $promise = $p.then($sub.then);
+              $promise!Handle::slot = $sqe.user_data;
+              $promise
             }
             else {
-                $p!Handle::slot = $sqe.user_data;
-                $p
+              $p!Handle::slot = $sqe.user_data;
+              $p
             }
           }
           else {
