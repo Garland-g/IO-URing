@@ -17,11 +17,11 @@ $wbuf2 = $val.encode.subbuf(5..^10);
 $rbuf1 = blob8.allocate(5);
 $rbuf2 = blob8.allocate(5);
 
-my @promises = $ring.submit(
+my @promises =
   $ring.prep-writev($handle, ($wbuf1, $wbuf2), :$data, :link),
   $ring.prep-fsync($handle, 0, :$data, :link),
-  $ring.prep-readv($handle, ($rbuf1, $rbuf2), :$data)
-);
+  $ring.prep-readv($handle, ($rbuf1, $rbuf2), :$data);
+$ring.submit();
 my $write = await @promises[0];
 my $sync = await @promises[1];
 my $read = await @promises[2];

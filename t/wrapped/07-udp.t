@@ -9,7 +9,7 @@ constant TEST_PORT = 31316;
 my $ring = IO::URing.new(:128entries);
 
 my $test-string = "Send me";
-my $server = IO::URing::Socket::INET.bind-udp('127.0.0.1', TEST_PORT, :$ring);
+my $server = IO::URing::Socket::INET.bind-udp('127.0.0.1', TEST_PORT, :$ring, :reuseaddr);
 my $client = IO::URing::Socket::INET.udp(:$ring);
 
 # All testing must be done inside this start block.

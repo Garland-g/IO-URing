@@ -7,12 +7,12 @@ my IO::URing $ring .= new(:4entries, :0flags);
 # Random values to prove that no cheating is happening
 my @test-val = (^1000).pick(3);
 
-my @submissions;
+my @handles;
 for @test-val -> $val {
-  @submissions.push: $ring.prep-nop(:data($val));
+  @handles.push: $ring.prep-nop(:data($val));
 }
 
-my @handles = $ring.submit(@submissions);
+$ring.submit();
 
 my $count = 0;
 
@@ -22,5 +22,6 @@ for @handles>>.result -> $compl {
   is $compl.data, @test-val[$count++], "Get val {$compl.data} back from kernel";
 }
 
+$ring.close;
 
 done-testing;

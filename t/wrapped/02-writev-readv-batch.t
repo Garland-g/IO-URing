@@ -17,10 +17,10 @@ $wbuf2 = $val.encode.subbuf(5..^10);
 $rbuf1 = blob8.allocate(5);
 $rbuf2 = blob8.allocate(5);
 
-my @submissions;
-@submissions.push: $ring.prep-writev($handle, ($wbuf1, $wbuf2), :$data, :link);
-@submissions.push: $ring.prep-readv($handle, ($rbuf1, $rbuf2), :$data);
-my @handles = $ring.submit(@submissions);
+my @handles;
+@handles.push: $ring.prep-writev($handle, ($wbuf1, $wbuf2), :$data, :link);
+@handles.push: $ring.prep-readv($handle, ($rbuf1, $rbuf2), :$data);
+$ring.submit();
 my $completion = await @handles[0];
 is $completion.data, $data, "Get val {$completion.data} back from kernel";
 is $handle.lines[0], $val, "Wrote temp data to file";

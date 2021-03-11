@@ -387,7 +387,7 @@ class io_uring_sqe is repr('CStruct') is rw {
     self
   }
 
-  method prep-connect(io_uring_sqe:D: $fd, sockaddr() $addr) {
+  method prep-connect(io_uring_sqe:D: $fd, sockaddr_role $addr) {
     self.prep(IORING_OP_CONNECT, $fd, nativecast(Pointer, $addr), 0, $addr.size);
     self
   }
@@ -656,7 +656,7 @@ sub io_uring_prep_accept(io_uring_sqe:D $sqe, $fd, $flags, $addr --> Nil) is inl
   $sqe.union-flags = $flags;
 }
 
-sub io_uring_prep_connect(io_uring_sqe:D $sqe, $fd, sockaddr() $addr --> Nil) is inlinable {
+sub io_uring_prep_connect(io_uring_sqe:D $sqe, $fd, sockaddr_role $addr --> Nil) is inlinable {
   io_uring_prep_rw(IORING_OP_CONNECT, $sqe, $fd, nativecast(Pointer, $addr), 0, $addr.size);
 }
 
@@ -670,6 +670,9 @@ sub io_uring_prep_recv(io_uring_sqe:D $sqe, $fd, Pointer[void] $buf, Int $len, I
   $sqe.union-flags = $flags;
 }
 
+sub io_uring_prep_close(io_uring_sqe:D $sqe, $fd) is inlinable {
+  io_uring_prep_rw(IORING_OP_CLOSE, $sqe, $fd, Str, 0, 0);
+}
 #multi sub io_uring_register_files(io_uring:D, Pointer[int32] $files, uint32 $num_files) returns int32 is native(LIB) { ... }
 
 #multi sub io_uring_register_files(io_uring $ring, @files where .all.^can("native-descriptor"), uint32 $num_files) returns int32 {
@@ -735,6 +738,7 @@ sub EXPORT() {
     '&io_uring_prep_connect' => &io_uring_prep_connect,
     '&io_uring_prep_send' => &io_uring_prep_send,
     '&io_uring_prep_recv' => &io_uring_prep_recv,
+    '&io_uring_prep_close' => &io_uring_prep_close,
     '&io_uring_get_probe_ring' => &io_uring_get_probe_ring,
     '&io_uring_get_probe' => &io_uring_get_probe,
     '&eventfd' => &eventfd,

@@ -6,13 +6,9 @@ use IO::URing::Raw;
 
 class RingClose does Log::Timeline::Event['IO::URing', 'Ring', 'RingClose'] {}
 
-class RingSubmit does Log::Timeline::Event['IO::URing', 'Ring', 'RingSubmit'] {}
-
 class Submit does Log::Timeline::Task['IO::URing', 'Submission', 'Submit'] {}
 
 class Receive does Log::Timeline::Task['IO::URing', 'Submission', 'Receive'] {}
-
-class Arm does Log::Timeline::Task['IO::URing', 'Submission', 'Arm'] {}
 
 class MemCpy does Log::Timeline::Task['IO::URing', 'Submission', 'MemCpy'] {}
 

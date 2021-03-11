@@ -230,14 +230,14 @@ role IO::URing::Socket is export {
 
   #| Close the socket.
   method close(IO::URing::Socket:D: --> True) {
-    $!ring.close-fd($!socket) unless $!dgram;
+    $!ring.close($!socket) unless $!dgram;
     $!ring.close if $!acceptable;
     try $!close-vow.keep(True);
   }
 
   #| Connect this socket to a peer.
   #| See specific socket type for details.
-  method connect(IO::URing::Socket:U: Str $host, $port?, |c) { ... }
+  method connect(IO::URing::Socket:U: Str $host, |c) { ... }
 
   #| Get the underlying descriptor for the socket.
   method native-descriptor(--> Int) {

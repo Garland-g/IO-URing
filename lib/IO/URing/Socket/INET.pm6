@@ -181,6 +181,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       ?? sockaddr_in6.new($address, $port)
       !! sockaddr_in.new($address, $port);
     $ring.connect($socket, $addr).then: -> $cmp {
+      $p.break("Failed to connect { strerror(-$cmp.result.result) }") if $cmp.result.result < 0;
       my $client_socket := nqp::create(self);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!socket', $socket);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ring', $ring);
