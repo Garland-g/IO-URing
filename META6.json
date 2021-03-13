@@ -17,6 +17,7 @@
   "depends": [
     "Constants::Netinet::In",
     "Constants::Sys::Socket",
+    "Hash::int",
     "Log::Timeline",
     "NativeHelpers::iovec",
     "Universal::errno"
