@@ -1,4 +1,5 @@
 use v6;
+use Hash::int;
 use IO::URing::Raw;
 use IO::URing::Socket::Raw :ALL;
 use IO::URing::LogTimelineSchema;
@@ -74,6 +75,16 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
     }
   }
 
+  my sub lock-int(atomicint $int is rw) is inlinable {
+    loop {
+      last if cas($int, 0, 1) == 0;
+    }
+  }
+
+  my sub unlock-int(atomicint $int is rw) is inlinable {
+    atomic-assign($int, 0);
+  }
+
 =begin pod
 
 =head1 IO::URing
@@ -90,10 +101,9 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   has int $.entries;
   has int32 $!eventfd;
   has io_uring_params $!params .= new;
-  has Lock::Async $!storage-lock .= new;
   has Lock::Async $!lock .= new;
-  has %!storage is default(STORAGE::EMPTY);
-  has Channel $!queue .= new;
+  has atomicint $!storage-int = 0;
+  has %!storage is Hash::int;
   has %!supported-ops;
 
   submethod TWEAK(UInt :$!entries!, UInt :$flags = tweak-flags, Int :$cq-size) {
@@ -174,14 +184,6 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   multi method close() {
     if $!ring ~~ io_uring:D {
       ($!ring, my $temp) = (Failure.new("Tried to use a closed IO::URing"), $!ring);
-      my @promises;
-      $!storage-lock.protect: {
-        for %!storage.keys -> $ptr {
-          @promises.push($temp.cancel(+$ptr));
-          free(Pointer[void].new(+$ptr));
-        }
-      }
-      await @promises;
       io_uring_queue_exit($temp);
       $!close-vow.keep(True);
     }
@@ -214,17 +216,17 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   method !store($vow, io_uring_sqe $sqe, $user_data --> Int) {
     my size_t $ptr = +malloc(1);
     my $started-task = opcode-to-operation(0xFFFF +& $sqe.opcode).start;
-    $!storage-lock.protect: {
-      %!storage{$ptr} = ($vow, $sqe, $user_data, $started-task);
-    };
+    lock-int($!storage-int);
+    %!storage{$ptr} = ($vow, $sqe, $user_data, $started-task);
+    unlock-int($!storage-int);
     $ptr;
   }
 
   method !retrieve(Int $slot) {
     my $tmp;
-    $!storage-lock.protect: {
-      $tmp = %!storage{$slot}:delete;
-    };
+    lock-int($!storage-int);
+    $tmp = %!storage{$slot}:delete;
+    unlock-int($!storage-int);
     $tmp[*-1].end;
     free(Pointer.new($slot));
     return $tmp;
