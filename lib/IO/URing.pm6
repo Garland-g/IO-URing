@@ -194,22 +194,22 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
     do for IORING_FEAT.enums { .key if $!params.features +& .value }
   }
 
-  my sub to-read-buf($item is rw, :$enc) {
+  my sub to-read-buf($item is rw, :$enc) is inlinable {
     return $item if $item ~~ Blob;
     die "Must pass a Blob";
   }
 
-  my sub to-read-bufs(@items, :$enc) {
+  my sub to-read-bufs(@items, :$enc) is inlinable {
     @items .= map(&to-read-buf, :$enc);
   }
 
-  my sub to-write-buf($item, :$enc) {
+  my sub to-write-buf($item, :$enc) is inlinable {
     return $item if $item ~~ Blob;
     return $item.encode($enc) if $item ~~ Str;
     return $item.Blob // fail "Don't know how to make $item.^name into a Blob";
   }
 
-  my sub to-write-bufs(@items, :$enc) {
+  my sub to-write-bufs(@items, :$enc) is inlinable {
     @items.map(&to-write-buf, :$enc);
   }
 
@@ -232,7 +232,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
     return $tmp;
   }
 
-  sub set-flags(:$drain, :$link, :$hard-link, :$force-async --> int) {
+  sub set-flags(:$drain, :$link, :$hard-link, :$force-async --> int) is inlinable {
     my int $flags = 0;
     $flags +|= IOSQE_IO_LINK if $link;
     $flags +|= IOSQE_IO_DRAIN if $drain;

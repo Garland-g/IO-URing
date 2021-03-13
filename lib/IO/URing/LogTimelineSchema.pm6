@@ -124,7 +124,7 @@ my constant op-hash = %{
   IORING_OP_EPOLL_CTL.Int => IO::URing::LogTimelineSchema::Op::EpollCtl,
 }
 
-sub opcode-to-operation(Int $opcode) is export {
+sub opcode-to-operation(Int $opcode) is inlinable is export {
   return op-hash{$opcode};
 }
 

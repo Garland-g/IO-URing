@@ -645,7 +645,7 @@ sub shutdown(sockfd $sockfd, int32 $how) returns int32 is native is error-model<
 
 # inet-{n,p}to{p,n} use non-standard error schemes
 
-sub inet-pton(|c) returns Bool is export(:inet-pton) {
+sub inet-pton(|c) returns Bool is inlinable is export(:inet-pton) {
   my int32 $result = _inet-pton(|c);
   return True if $result == 1;
   return fail "Invalid address" if $result == 0;
@@ -653,7 +653,7 @@ sub inet-pton(|c) returns Bool is export(:inet-pton) {
 
 sub _inet-pton(int32, Str, Pointer[void]) returns int32 is native is error-model<errno> is symbol('inet_pton') is export(:_inet-pton) {...}
 
-sub inet-ntop(|c) returns Str is export(:inet-ntop) {
+sub inet-ntop(|c) returns Str is inlinable is export(:inet-ntop) {
   my $result = _inet-ntop(|c);
   return $result if $result ~~ Str:D;
   my $failure = fail errno.symbol;

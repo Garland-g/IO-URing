@@ -549,7 +549,7 @@ sub _io_uring_queue_init(uint32 $entries, io_uring:D, uint32 $flags) returns int
 sub io_uring_ring_dontfork(io_uring:D --> int32) is native(LIB) is error-model<neg-errno> { ... }
 sub io_uring_queue_exit(io_uring:D) is native(LIB) { ... }
 
-sub io_uring_submit(|c) returns int32 {
+sub io_uring_submit(|c) returns int32 is inlinable {
   my int32 $result = _io_uring_submit(|c);
   return $result < 0
   ?? do {
@@ -584,7 +584,7 @@ sub io_uring_wait_cqe_timeout(io_uring:D, Pointer[io_uring_cqe] is rw, kernel_ti
 
 sub _io_uring_get_sqe(io_uring:D) returns io_uring_sqe is native(LIB) is symbol('io_uring_get_sqe') { ... }
 
-sub io_uring_get_sqe(io_uring:D $ring) returns io_uring_sqe {
+sub io_uring_get_sqe(io_uring:D $ring) returns io_uring_sqe is inlinable {
   my $sqe := _io_uring_get_sqe($ring);
   $sqe.defined ?? $sqe !! Failure.new("Submission ring is out of room");
 }
