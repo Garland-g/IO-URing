@@ -99,7 +99,6 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   has $!close-vow;
   has $!ring;
   has int $.entries;
-  has int32 $!eventfd;
   has io_uring_params $!params .= new;
   has atomicint $sqe-int = 0;
   has atomicint $!storage-int = 0;
@@ -119,7 +118,6 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
       $!params.cq_entries = $cq-size;
     }
     $!ring = io_uring.new(:$!entries, :$!params);
-    $!eventfd = eventfd(1, 0);
     start {
       my Pointer[io_uring_cqe] $cqe_ptr .= new;
       my $vow;
