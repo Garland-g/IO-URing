@@ -50,6 +50,9 @@ This code uses liburing to set up and submit requests to the ring.
 
 =end pod
 
+
+# Atomic ints and cas are used for synchronization.
+# Here be Dragons
 class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   my enum STORAGE <EMPTY>;
 
@@ -100,8 +103,14 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   has $!ring;
   has int $.entries;
   has io_uring_params $!params .= new;
-  has atomicint $sqe-int = 0;
-  has atomicint $!storage-int = 0;
+  # The number of threads currently preparing an sqe.
+  has atomicint $!prepare-threads = 0;
+  # SQE ringbuffer lock
+  has atomicint $!sqe-lock = 0;
+  # Hash storage lock
+  has atomicint $!storage-lock = 0;
+  # Submitting thread lock
+  has atomicint $!submitting = 0;
   has %!storage is Hash::int;
   has %!supported-ops;
 
@@ -158,10 +167,11 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
     }
   }
 
-  my sub get-sqe(atomicint $lock is rw, $ring is rw --> io_uring_sqe) is inlinable {
+  my sub get-sqe(atomicint $lock is rw, atomicint $threads is rw, $ring is rw --> io_uring_sqe) is inlinable {
     my $sqe;
     lock-int($lock);
     $sqe = $ring.get-sqe;
+    atomic-inc-fetch($threads);
     unlock-int($lock);
     return $sqe;
   }
@@ -169,15 +179,18 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   method !get-handle(io_uring_sqe $sqe, $data, &then?) {
     my Handle $p .= new;
     $sqe.user_data = self!store($p.vow, $sqe, $data // Nil);
+    my $return;
     with &then {
       my $promise = $p.then(&then);
       $promise!Handle::slot = $sqe.user_data;
-      $promise
+      $return = $promise;
     }
     else {
       $p!Handle::slot = $sqe.user_data;
-      $p
+      $return = $p;
     }
+    atomic-dec-fetch($!prepare-threads);
+    return $return;
   }
 
   #| Close the IO::URing object and shut down event processing.
@@ -216,17 +229,17 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   method !store($vow, io_uring_sqe $sqe, $user_data --> Int) {
     my size_t $ptr = +malloc(1);
     my $started-task = opcode-to-operation(0xFFFF +& $sqe.opcode).start;
-    lock-int($!storage-int);
+    lock-int($!storage-lock);
     %!storage{$ptr} = ($vow, $sqe, $user_data, $started-task);
-    unlock-int($!storage-int);
+    unlock-int($!storage-lock);
     $ptr;
   }
 
   method !retrieve(Int $slot) {
     my $tmp;
-    lock-int($!storage-int);
+    lock-int($!storage-lock);
     $tmp = %!storage{$slot}:delete;
-    unlock-int($!storage-int);
+    unlock-int($!storage-lock);
     $tmp[*-1].end;
     free(Pointer.new($slot));
     return $tmp;
@@ -243,14 +256,25 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
 
   method submit() {
     IO::URing::LogTimelineSchema::Submit.log: {
-      $!ring.submit();
+      # If you are the thread that is submitting,
+      # Else, some other thread is submitting: Do nothing.
+      if cas($!submitting, 0, -1) == 0 {
+        # Prevent any threads from getting more SQEs.
+        lock-int($!sqe-lock);
+        loop {
+          last if atomic-fetch($!prepare-threads) == 0;
+        }
+        $!ring.submit;
+        unlock-int($!sqe-lock);
+        atomic-assign($!submitting, 0);
+      }
     }
   }
 
   #| Prepare a no-op operation.
   method prep-nop(Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_nop($sqe);
     $sqe.flags = $flags;
     $sqe.ioprio = $ioprio;
@@ -296,7 +320,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
         $pos += 2;
       }
     }
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_readv($sqe, $fd, nativecast(Pointer[void], $iovecs), $len, $offset);
     $sqe.flags = $flags;
     $sqe.ioprio = $ioprio;
@@ -350,7 +374,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
         $pos += 2;
       }
     }
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_writev($sqe, $fd, nativecast(Pointer[void], $iovecs), $len, $offset);
     $sqe.flags = $flags;
     $sqe.ioprio = $ioprio;
@@ -379,7 +403,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| fsync-flags can be set to IORING_FSYNC_DATASYNC to use fdatasync(2) instead. Defaults to fsync(2).
   multi method prep-fsync(Int $fd, UInt $fsync-flags = 0, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_fsync($sqe, $fd, $fsync-flags +& 0xFFFFFFFF);
     $sqe.flags = $flags;
     $sqe.ioprio = $ioprio;
@@ -402,7 +426,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-poll-add(Int $fd, UInt $poll-mask, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_poll_add($sqe, $fd, $poll-mask);
     $sqe.flags = $flags;
     $sqe.ioprio = 0;
@@ -421,7 +445,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| The provided Handle must be the Handle returned by the poll-add operation that should be cancelled.
   method prep-poll-remove(Handle $slot, Int :$ioprio = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_poll_remove($sqe, $slot!Handle::slot);
     $sqe.flags = $flags;
     $sqe.ioprio = 0;
@@ -462,7 +486,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   }
 
   #| Prepare and submit a sendmsg operation, mimicking sendto(2).
-  multi method sendto($fd, Blob $blob, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle ) {
+  multi method sendto(Int $fd, Blob $blob, Int $union-flags, sockaddr_role $addr, Int $len, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle ) {
     my $handle = self.prep-sendto($fd, $blob, $union-flags, $addr, $len, :$data, :$drain, :$link, :$hard-link, :$force-async);
     self.submit();
     return $handle;
@@ -476,7 +500,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-sendmsg(Int $fd, msghdr:D $msg, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_sendmsg($sqe, $fd, nativecast(Pointer, $msg), $union-flags);
     $sqe.flags = $flags;
     return self!get-handle($sqe, $data);
@@ -522,7 +546,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-recvmsg(Int $fd, msghdr:D $msg is rw, $union-flags, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_recvmsg($sqe, $fd, nativecast(Pointer, $msg), $union-flags);
     $sqe.flags = $flags;
     return self!get-handle($sqe, $data);
@@ -544,7 +568,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| This means that both cases must be handled.
   method prep-cancel(Handle $slot, UInt $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_cancel($sqe, $union-flags, $slot!Handle::slot);
     $sqe.flags = $flags;
     return self!get-handle($sqe, $data);
@@ -565,7 +589,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-accept(Int $fd, $sockaddr = Str, Int $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_accept($sqe, $fd, $union-flags, $sockaddr);
     $sqe.flags = $flags;
     return self!get-handle($sqe, $data);
@@ -586,7 +610,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-connect(Int $fd, sockaddr_role $sockaddr, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_connect($sqe, $fd, $sockaddr);
     $sqe.flags = $flags;
     return self!get-handle($sqe, $data);
@@ -612,7 +636,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-send(Int $fd, Blob $buf, $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_send($sqe, $fd, nativecast(Pointer[void], $buf), $buf.bytes, $union-flags);
     $sqe.flags = $flags;
     return self!get-handle($sqe, $data);
@@ -633,7 +657,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-recv(Int $fd, Blob $buf, Int $union-flags = 0, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_recv($sqe, $fd, nativecast(Pointer[void], $buf), $buf.bytes, $union-flags);
     $sqe.flags = $flags;
     return self!get-handle($sqe, $data);
@@ -654,7 +678,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   #| A multi will handle a non-Int $fd by calling native-descriptor.
   multi method prep-close(IO::URing:D: Int $fd, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
-    my $sqe = get-sqe($!sqe-int, $!ring);
+    my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring);
     io_uring_prep_close($sqe, $fd);
     $sqe.flags = $flags;
     return self!get-handle($sqe, $data);
