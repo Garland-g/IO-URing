@@ -528,34 +528,29 @@ enum IORING_REGISTER (
 );
 
 sub _io_uring_queue_init_params(uint32 $entries, io_uring:D, io_uring_params:D)
-        returns int32 is native(LIB) is symbol('io_uring_queue_init_params') is error-model<neg-errno> { ... }
+        returns int32 is native(LIB) is symbol('io_uring_queue_init_params') { ... }
 
-sub io_uring_queue_init_params(UInt $entries, io_uring:D $ring, io_uring_params:D $params) returns int32 {
+sub io_uring_queue_init_params(UInt $entries, io_uring:D $ring, io_uring_params:D $params) returns int32 is inlinable {
   my uint32 $entries-u32 = $entries;
-  _io_uring_queue_init_params($entries-u32, $ring, $params);
+  return check-neg-errno _io_uring_queue_init_params($entries-u32, $ring, $params);
 }
 
-sub io_uring_queue_init(UInt $entries, io_uring:D $ring, UInt $flags) returns int32 {
+sub io_uring_queue_init(UInt $entries, io_uring:D $ring, UInt $flags) returns int32 is inlinable {
   my uint32 $entries-u32 = $entries;
   my uint32 $flags-u32 = $flags;
-  _io_uring_queue_init($entries-u32, $ring, $flags-u32);
+  check-neg-errno _io_uring_queue_init($entries-u32, $ring, $flags-u32);
 }
 
 sub _io_uring_queue_init(uint32 $entries, io_uring:D, uint32 $flags) returns int32
-  is native(LIB) is symbol('io_uring_queue_init') is error-model<neg-errno> { ... }
+  is native(LIB) is symbol('io_uring_queue_init') { ... }
 
 #sub io_uring_queue_mmap(int32 $fd, io_uring_params:D, io_uring:D) is native(LIB) { ... }
 
-sub io_uring_ring_dontfork(io_uring:D --> int32) is native(LIB) is error-model<neg-errno> { ... }
+sub io_uring_ring_dontfork(io_uring:D --> int32) is native(LIB) { ... }
 sub io_uring_queue_exit(io_uring:D) is native(LIB) { ... }
 
 sub io_uring_submit(|c) returns int32 is inlinable {
-  my int32 $result = _io_uring_submit(|c);
-  return $result < 0
-  ?? do {
-    fail "sqe submit failed: $result";
-  }
-  !! $result
+  return check-neg-errno _io_uring_submit(|c);
 }
 
 sub _io_uring_submit(io_uring:D --> int32) is native(LIB) is symbol('io_uring_submit') { ... }
@@ -573,14 +568,18 @@ sub io_uring_peek_batch_cqe(io_uring:D, Pointer[io_uring_cqe] is rw, uint32) ret
 #}
 
 sub __io_uring_get_cqe(io_uring:D, Pointer[io_uring_cqe] is rw, uint32, uint32, Pointer) returns int32
-  is native(LIB) is error-model<neg-errno> { ... }
+  is native(LIB) { ... }
 
 sub io_uring_wait_cqe_nr(io_uring:D \ring, Pointer[io_uring_cqe] $cqe-ptr is rw, uint32 \wait-nr) returns int32 is inlinable {
-  return __io_uring_get_cqe(ring, $cqe-ptr, 0, wait-nr, Pointer);
+  return check-neg-errno __io_uring_get_cqe(ring, $cqe-ptr, 0, wait-nr, Pointer);
 }
 
-sub io_uring_wait_cqe_timeout(io_uring:D, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32
-  is native(LIB) is error-model<neg-errno> { ... }
+sub _io_uring_wait_cqe_timeout(io_uring:D, Pointer[io_uring_cqe] is rw, kernel_timespec) returns int32
+  is native(LIB) is symbol('io_uring_wait_cqe_timeout') { ... }
+
+sub io_uring_wait_cqe_timeout(|c) is inlinable {
+  check-neg-errno _io_uring_wait_cqe_timeout(|c);
+}
 
 sub _io_uring_get_sqe(io_uring:D) returns io_uring_sqe is native(LIB) is symbol('io_uring_get_sqe') { ... }
 
