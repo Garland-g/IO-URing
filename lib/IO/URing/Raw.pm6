@@ -228,6 +228,11 @@ class io_uring_params is repr('CStruct') {
   has uint32 $.resv2;
   HAS io_sqring_offsets $.sq_off;
   HAS io_cqring_offsets $.cq_off;
+
+  submethod TWEAK() {
+    $!sq_off := io_sqring_offsets.new;
+    $!cq_off := io_cqring_offsets.new;
+  }
 }
 
 # io_uring_params features flags
@@ -429,6 +434,11 @@ class io_uring_sq is repr('CStruct') {
 
   has size_t $.ring_sz;
   has Pointer $.ring_ptr;
+
+  has uint32 $.pad0;
+  has uint32 $.pad1;
+  has uint32 $.pad2;
+  has uint32 $.pad3;
 }
 
 class io_uring_cq is repr('CStruct') {
@@ -441,6 +451,11 @@ class io_uring_cq is repr('CStruct') {
 
   has size_t $.ring_sz;
   has Pointer $.ring_ptr;
+
+  has uint32 $.pad0;
+  has uint32 $.pad1;
+  has uint32 $.pad2;
+  has uint32 $.pad3;
 }
 
 class io_uring is repr('CStruct') {
@@ -448,6 +463,12 @@ class io_uring is repr('CStruct') {
   HAS io_uring_cq $.cq;
   has uint32 $.flags;
   has int32 $.ring_fd;
+
+  has uint32 $.features;
+  has uint32 $.pad0;
+  has uint32 $.pad1;
+  has uint32 $.pad2;
+
   submethod TWEAK(:$entries!, :$flags, :$params, :$allow-fork = False) {
     $!sq := io_uring_sq.new;
     $!cq := io_uring_cq.new;
