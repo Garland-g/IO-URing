@@ -1,7 +1,7 @@
 my $version = Version.new($*KERNEL.release);
 
-die "Must be loaded on Linux 5.1 or higher"
-  unless $*KERNEL ~~ 'linux' && $version ~~ v5.1+;
+die "Must be loaded on Linux 5.6 or higher"
+  unless $*KERNEL ~~ 'linux' && $version ~~ v5.6+;
 
 use NativeCall;
 use IO::URing::Socket::Raw :ALL;
