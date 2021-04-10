@@ -2,8 +2,10 @@
 /.panda-work
 /resources/*.so
 /resources/*.dylib
+/resources/libraries/*
 .precomp/
 /io_uring-*
 /examples/*
 /wip-t/*
 /.idea/*
+Makefile
