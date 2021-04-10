@@ -574,6 +574,15 @@ sub io_uring_submit(|c) returns int32 is inlinable {
   return check-neg-errno _io_uring_submit(|c);
 }
 
+sub io_uring_submit_retry(|c) returns int32 is inlinable {
+  my int32 $result;
+  loop {
+    $result = _io_uring_submit(|c);
+    last if -$result != Universal::errno::Contants::EBUSY;
+  }
+  return check-neg-errno $result;
+}
+
 sub _io_uring_submit(io_uring:D --> int32) is native(LIB) is symbol('io_uring_submit') { ... }
 
 sub io_uring_submit_and_wait(io_uring:D, uint32 $wait_nr) is native(LIB) returns int32 { ... }
@@ -741,6 +750,7 @@ sub EXPORT() {
     '&io_uring_cqe_seen' => &io_uring_cqe_seen,
     '&io_uring_submit' => &io_uring_submit,
     '&io_uring_submit_and_wait' => &io_uring_submit_and_wait,
+    '&io_uring_submit_retry' => &io_uring_submit_retry,
     '&io_uring_peek_batch_cqe' => &io_uring_peek_batch_cqe,
     '&io_uring_wait_cqe_timeout' => &io_uring_wait_cqe_timeout,
     '&io_uring_wait_cqe' => &io_uring_wait_cqe,
