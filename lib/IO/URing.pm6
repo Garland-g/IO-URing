@@ -113,7 +113,8 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   has atomicint $!submitting = 0;
   has %!storage is Hash::int;
   has %!supported-ops;
-  has $.cqe-entries;
+  has int $.cqe-entries;
+  has int $.sqe-entries;
 
   submethod TWEAK(UInt :$!entries!, UInt :$flags = tweak-flags, Int :$cq-size) {
     $!close-promise = Promise.new;
@@ -128,7 +129,8 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
       $!params.cq_entries = $cq-size;
     }
     $!ring = io_uring.new(:$!entries, :$!params);
-    $!cqe-entries = $!ring.cq.kring_entries.deref;
+    $!cqe-entries = $!params.cq_entries;
+    $!sqe-entries = $!params.sq_entries;
     start {
       my Pointer[io_uring_cqe] $cqe_ptr .= new;
       my $vow;
