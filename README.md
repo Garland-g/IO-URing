@@ -42,7 +42,7 @@ A Completion is returned from an awaited Handle. The completion contains the res
 
 ### has Mu $.data
 
-The user data passed into the Submission.
+The user data passed into the submission.
 
 ### has io_uring_sqe $.request
 
@@ -56,11 +56,6 @@ class IO::URing::Handle
 -----------------------
 
 A Handle is a Promise that can be used to cancel an IO::URing operation. Every call to submit or any non-prep operation will return a Handle.
-
-class IO::URing::Submission
----------------------------
-
-A Submission holds a request for an operation. Every call to a "prep" method will return a Submission. A Submission can be passed into the submit method.
 
 IO::URing
 =========
@@ -84,37 +79,17 @@ method features() returns Mu
 
 Get the enabled features on this IO::URing.
 
-### multi method submit
-
-```perl6
-multi method submit(
-    @submissions
-) returns Array[IO::URing::Handle]
-```
-
-Submit multiple Submissions to the IO::URing. A slurpy variant is provided. Returns an Array of Handles.
-
-### multi method submit
-
-```perl6
-multi method submit(
-    IO::URing::Submission $sub
-) returns IO::URing::Handle
-```
-
-Submit a single Submission to the IO::URing. Returns a Handle.
-
 ### method prep-nop
 
 ```perl6
 method prep-nop(
+    Int :$ioprio = 0,
     :$data,
-    :$ioprio = 0,
     :$drain,
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a no-op operation.
@@ -142,7 +117,7 @@ multi method prep-readv(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a readv operation. A multi will handle a non-Int $fd by calling native-descriptor. A multi with a @bufs slurpy is provided.
@@ -171,7 +146,7 @@ multi method prep-writev(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a writev operation. A multi will handle a non-Int $fd by calling native-descriptor. A multi with a @bufs slurpy is provided.
@@ -198,7 +173,7 @@ multi method prep-fsync(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare an fsync operation. fsync-flags can be set to IORING_FSYNC_DATASYNC to use fdatasync(2) instead. Defaults to fsync(2).
@@ -231,7 +206,7 @@ multi method prep-poll-add(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a poll-add operation. A multi will handle a non-Int $fd by calling native-descriptor.
@@ -263,7 +238,7 @@ method prep-poll-remove(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a poll-remove operation. The provided Handle must be the Handle returned by the poll-add operation that should be cancelled.
@@ -298,7 +273,7 @@ multi method prep-sendto(
     :$hard-link,
     :$force-async,
     :$enc = "utf-8"
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a sendmsg operation, mimicking sendto(2). A multi is provided that takes Blobs. A multi will handle a non-Int $fd by calling native-descriptor.
@@ -307,7 +282,7 @@ Prepare a sendmsg operation, mimicking sendto(2). A multi is provided that takes
 
 ```perl6
 multi method sendto(
-    $fd,
+    Int $fd,
     Blob $blob,
     Int $union-flags,
     sockaddr_role $addr,
@@ -334,7 +309,7 @@ multi method prep-sendmsg(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a sendmsg operation. A multi will handle a non-Int $fd by calling native-descriptor.
@@ -369,7 +344,7 @@ multi method prep-recvfrom(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a recvmsg operation, mimicking recvfrom(2). A multi is provided that takes Blobs. A multi will handle a non-Int $fd by calling native-descriptor.
@@ -404,7 +379,7 @@ multi method prep-recvmsg(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a recvmsg operation. A multi will handle a non-Int $fd by calling native-descriptor.
@@ -437,7 +412,7 @@ method prep-cancel(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a cancel operation to cancel a previously submitted operation. Note that this chases an in-flight operation, meaning it may or maybe not be successful in cancelling the operation. This means that both cases must be handled.
@@ -463,14 +438,14 @@ Prepare and submit a cancel operation
 ```perl6
 multi method prep-accept(
     Int $fd,
-    $sockaddr?,
+    $sockaddr = Str,
     Int $union-flags = 0,
     :$data,
     :$drain,
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare an accept operation. A multi will handle a non-Int $fd by calling native-descriptor.
@@ -503,7 +478,7 @@ multi method prep-connect(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a connect operation. A multi will handle a non-Int $fd by calling native-descriptor.
@@ -536,7 +511,7 @@ multi method prep-send(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a send operation. A multi will handle a Str submission., which takes a named parameter :$enc = 'utf-8'. A multi will handle a non-Int $fd by calling native-descriptor.
@@ -571,7 +546,7 @@ multi method prep-recv(
     :$link,
     :$hard-link,
     :$force-async
-) returns IO::URing::Submission
+) returns IO::URing::Handle
 ```
 
 Prepare a recv operation. A multi will handle a non-Int $fd by calling native-descriptor.
@@ -593,15 +568,35 @@ multi method recv(
 
 Prepare and submit a recv operation.
 
+### multi method prep-close-fd
+
+```perl6
+multi method prep-close-fd(
+    Int $fd,
+    :$data,
+    :$drain,
+    :$link,
+    :$hard-link,
+    :$force-async
+) returns IO::URing::Handle
+```
+
+Prepare a close operation. A multi will handle a non-Int $fd by calling native-descriptor.
+
 ### method close-fd
 
 ```perl6
 method close-fd(
-    Int $fd
+    Int $fd,
+    :$data,
+    :$drain,
+    :$link,
+    :$hard-link,
+    :$force-async
 ) returns IO::URing::Handle
 ```
 
-Prepare a submit a close-fd operation. This is a fake operation which will be used until linux kernels older than 5.6 are unsupported.
+Prepare and submit a close operation.
 
 ### multi method supported-ops
 
