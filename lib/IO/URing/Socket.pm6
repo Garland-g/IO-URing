@@ -79,7 +79,7 @@ role IO::URing::Socket is export {
   has $!ring;
   has $!domain;
   has $!ipproto;
-  has $!acceptable = 1;
+  has $!managed = 1;
 
   method new() {
     die "Cannot directly instantiate an IO::URing::Socket. Please use\n" ~
@@ -230,8 +230,9 @@ role IO::URing::Socket is export {
 
   #| Close the socket.
   method close(IO::URing::Socket:D: --> True) {
-    $!ring.close($!socket) unless $!dgram;
-    $!ring.close if $!acceptable;
+    $!ring.close-fd($!socket) unless $!dgram;
+    # Close the ring if it was created by the library
+    $!ring.close if $!managed;
     try $!close-vow.keep(True);
   }
 

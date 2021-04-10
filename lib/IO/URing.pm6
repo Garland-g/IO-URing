@@ -204,7 +204,7 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   }
 
   #| Close the IO::URing object and shut down event processing.
-  multi method close() {
+  method close() {
     if $!ring ~~ io_uring:D {
       ($!ring, my $temp) = (Failure.new("Tried to use a closed IO::URing"), $!ring);
       io_uring_queue_exit($temp);
@@ -681,13 +681,13 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
     return $handle;
   }
 
-  multi method prep-close(IO::URing:D: $fd, |c) {
-    self.prep-close($fd.native-descriptor, |c);
+  multi method prep-close-fd(IO::URing:D: $fd, |c) {
+    self.prep-close-fd($fd.native-descriptor, |c);
   }
 
   #| Prepare a close operation.
   #| A multi will handle a non-Int $fd by calling native-descriptor.
-  multi method prep-close(IO::URing:D: Int $fd, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+  multi method prep-close-fd(IO::URing:D: Int $fd, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
     my int $flags = set-flags(:$drain, :$link, :$hard-link, :$force-async);
     my $sqe = get-sqe($!sqe-lock, $!prepare-threads, $!ring, $!sqe-entries);
     io_uring_prep_close($sqe, $fd);
@@ -696,8 +696,8 @@ class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
   }
 
   #| Prepare and submit a close operation.
-  multi method close(IO::URing:D: Int $fd, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
-    my $handle = self.prep-close($fd, :$data, :$drain, :$link, :$hard-link, :$force-async);
+  method close-fd(IO::URing:D: Int $fd, :$data, :$drain, :$link, :$hard-link, :$force-async --> Handle) {
+    my $handle = self.prep-close-fd($fd, :$data, :$drain, :$link, :$hard-link, :$force-async);
     self.submit();
     return $handle;
   }
