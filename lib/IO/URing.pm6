@@ -53,7 +53,7 @@ This code uses liburing to set up and submit requests to the ring.
 
 # Atomic ints and cas are used for synchronization.
 # Here be Dragons
-class IO::URing:ver<0.1.0>:auth<cpan:GARLANDG> {
+class IO::URing:ver<0.2.0>:auth<cpan:GARLANDG> {
   my enum STORAGE <EMPTY>;
 
   #| A Completion is returned from an awaited Handle.

@@ -2,6 +2,16 @@ Revision history for io_uring
 
 {{$NEXT}}
 
+0.2.0  2021-04-10T12:25:40-07:00
+    - Bump minimum Linux kernel version to v5.6 for IORING_OP_CLOSE
+    - Fix incorrect io_uring struct definitions to fix crashes
+    - Switch from single management thread to multi-threaded submission
+        for massive speed increase
+    - Allow use of existing IO::URing objects when creating sockets
+    - Better clarity on method names:
+      - close closes the ring
+      - close-fd closes a file descriptor using IORING_OP_CLOSE
+
 0.1.0  2021-02-21T15:53:59-08:00
     - Better use of msghdr in sendmsg and recvmsg.
     - Fix multiple issues with UNIX datagram sockets:
