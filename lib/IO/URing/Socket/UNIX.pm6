@@ -135,18 +135,21 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
   }
 
   #| Connect to an AF_UNIX socket.
-  method connect(IO::URing::Socket::UNIX:U: Str $address, :$enc = 'utf-8', IO::URing:D :$ring = IO::URing.new(:128entries)) {
+  method connect(IO::URing::Socket::UNIX:U: Str $address, :$enc = 'utf-8', IO::URing :$ring = IO::URing:U) {
     my $p = Promise.new;
     my $v = $p.vow;
     my $encoding = Encoding::Registry.find($enc);
     my $domain = AF::UNIX;
     my $socket = socket($domain, SOCK::STREAM, 0);
     my $addr = sockaddr_un.new($address);
-    $ring.connect($socket, $addr).then: -> $cmp {
+    my $managed = not $ring.defined;
+    my $ring-d := $ring // IO::URing.new(:128entries);
+    $ring-d.connect($socket, $addr).then: -> $cmp {
       use nqp;
       my $client_socket := nqp::create(self);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!socket', $socket);
-      nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!ring', $ring);
+      nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!ring', $ring-d);
+      nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!managed', $managed);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!enc', $encoding.name);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!encoder', $encoding.encoder());
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!domain', $domain);
@@ -189,12 +192,13 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
     has $!encoding;
     has $!scheduler;
     has $!ring;
+    has $!managed;
 
-    method new(:$host!, :$backlog!, :$encoding!, :$scheduler!, :$ring!) {
-      self.CREATE!SET-SELF($host, $backlog, $encoding, $scheduler, $ring)
+    method new(:$host!, :$backlog!, :$encoding!, :$scheduler!, :$ring!, :$managed!) {
+      self.CREATE!SET-SELF($host, $backlog, $encoding, $scheduler, $ring, $managed)
     }
 
-    method !SET-SELF($!host, $!backlog, $!encoding, $!scheduler, $!ring) { self }
+    method !SET-SELF($!host, $!backlog, $!encoding, $!scheduler, $!ring, $!managed) { self }
 
     method tap(&emit, &done, &quit, &tap) {
       my $lock := Lock::Async.new;
@@ -227,7 +231,8 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
                 my \fd = $cmp.result.result;
                 my $client_socket := nqp::create(IO::URing::Socket::UNIX);
                 nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!socket', fd);
-                nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!ring', IO::URing.new(:16entries));
+                nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!ring', $!ring);
+                nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!managed', $!managed);
                 nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!enc',
                         $!encoding.name);
                 nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!encoder',
@@ -267,26 +272,30 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
 
   #| Listen for incoming connections.
   method listen(IO::URing::Socket::UNIX:U: Str $host, Int() $backlog = 128,
-          :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
-    my $domain = AF::UNIX;
+          :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing :$ring = IO::URing:U) {
     my $encoding = Encoding::Registry.find($enc);
+    my $managed = not $ring.defined;
+    my $ring-d = $ring // IO::URing.new(:128entries);
     Supply.new: SocketListenerTappable.new:
-            :$host, :$ring, :$backlog, :$encoding, :$scheduler
+            :$host, :ring($ring-d), :$backlog, :$encoding, :$scheduler, :$managed
   }
 
   #| Set up a socket to send datagrams.
   method dgram(IO::URing::Socket::UNIX:U: :$enc = 'utf-8', :$scheduler = $*SCHEDULER,
-                    :$ring = IO::URing.new(:128entries)) {
+               IO::URing :$ring = IO::URing:U) {
     my $p = Promise.new;
     $scheduler.cue: -> {
       my $socket = socket(AF::UNIX, SOCK::DGRAM, 0);
       my $encoding = Encoding::Registry.find($enc);
       my $client_socket := nqp::create(self);
+      my $managed = not $ring.defined;
+      my $ring-d = $ring // IO::URing.new(:128entries);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!socket', $socket);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!domain', AF::UNIX);
       nqp::bindattr_i($client_socket, IO::URing::Socket::UNIX, '$!dgram', 1);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!datagram', UNIX-Datagram);
-      nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!ring', $ring);
+      nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!ring', $ring-d);
+      nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!managed', $managed);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!enc', $encoding.name);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!encoder',
               $encoding.encoder());
@@ -298,17 +307,20 @@ class IO::URing::Socket::UNIX does IO::URing::Socket is export {
 
   #| Set up a socket to listen for datagrams
   method bind-dgram(IO::URing::Socket::UNIX:U: Str() $host, :$enc = 'utf-8', :$scheduler = $*SCHEDULER,
-                    IO::URing:D :$ring = IO::URing.new(:128entries)) {
+                    IO::URing :$ring = IO::URing:U) {
     my $p = Promise.new;
     $scheduler.cue: -> {
       my $socket = socket(AF::UNIX, SOCK::DGRAM, 0);
       my $encoding = Encoding::Registry.find($enc);
       my $client_socket := nqp::create(self);
+      my $managed = not $ring.defined;
+      my $ring-d = $ring // IO::URing.new(:128entries);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!socket', $socket);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!domain', AF::UNIX);
       nqp::bindattr_i($client_socket, IO::URing::Socket::UNIX, '$!dgram', 1);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!datagram', UNIX-Datagram);
-      nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!ring', $ring);
+      nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!ring', $ring-d);
+      nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!managed', $managed);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!enc', $encoding.name);
       nqp::bindattr($client_socket, IO::URing::Socket::UNIX, '$!encoder',
               $encoding.encoder());

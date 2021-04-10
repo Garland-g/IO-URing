@@ -170,13 +170,15 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
 
   #| Connect to a remote socket.
   method connect(IO::URing::Socket::INET:U: Str $address, Int $port where IO::Socket::Async::Port-Number, :$ip6,
-                :$enc = 'utf-8', IO::URing:D :$ring = IO::URing.new(:128entries)) {
+                :$enc = 'utf-8', IO::URing :$ring = IO::URing:U) {
     my $p = Promise.new;
     my $v = $p.vow;
     my $encoding = Encoding::Registry.find($enc);
     my $domain = $ip6 ?? AF::INET6 !! AF::INET;
     my $ipproto = $ip6 ?? IPPROTO::IPV6 !! IPPROTO::IP;
     my $socket = socket($domain, SOCK::STREAM, 0);
+    my $managed = not $ring.defined;
+    my $ring-d = $ring // IO::URing.new(:128entries);
     my $addr = $domain ~~ AF::INET6
       ?? sockaddr_in6.new($address, $port)
       !! sockaddr_in.new($address, $port);
@@ -184,7 +186,8 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       $p.break("Failed to connect { strerror(-$cmp.result.result) }") if $cmp.result.result < 0;
       my $client_socket := nqp::create(self);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!socket', $socket);
-      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ring', $ring);
+      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ring', $ring-d);
+      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!managed', $managed);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!enc', $encoding.name);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!encoder', $encoding.encoder());
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!domain', $domain);
@@ -233,14 +236,15 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
     has $!ring;
     has $!domain;
     has $!ipproto;
+    has $!managed;
 
-    method new(:$host!, :$port!, :$backlog!, :$encoding!, :$scheduler!, :$ring!, :$domain!, :$ipproto!, :$reuseaddr, :$reuseport) {
-      self.CREATE!SET-SELF($host, $port, $backlog, $encoding, $scheduler, $ring, $domain, $ipproto, $reuseaddr, $reuseport)
+    method new(:$host!, :$port!, :$backlog!, :$encoding!, :$scheduler!, :$ring!, :$domain!, :$ipproto!, :$managed!, :$reuseaddr, :$reuseport) {
+      self.CREATE!SET-SELF($host, $port, $backlog, $encoding, $scheduler, $ring, $domain, $ipproto, $managed, $reuseaddr, $reuseport)
     }
 
-    method !SET-SELF($!host, $!port, $!backlog, $!encoding, $!scheduler, $!ring, $!domain, $!ipproto, $!reuseaddr?, $!reuseport?) { self }
+    method !SET-SELF($!host, $!port, $!backlog, $!encoding, $!scheduler, $!ring, $!domain, $!ipproto, $!managed, $!reuseaddr?, $!reuseport?) { self }
 
-    my sub reuseaddr($socket, $reuseaddr) {
+    my sub reuseaddr($socket, $reuseaddr) is inlinable {
       my buf8 $opt .= new;
       $opt.write-uint32(0, $reuseaddr ?? 1 !! 0);
       setsockopt(
@@ -252,7 +256,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
               )
     }
 
-    my sub reuseport($socket, $reuseport) {
+    my sub reuseport($socket, $reuseport) is inlinable {
       my buf8 $opt .= new;
       $opt.write-uint32(0, $reuseport ?? 1 !! 0);
       setsockopt(
@@ -305,12 +309,12 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
                 my $client_socket := nqp::create(IO::URing::Socket::INET);
                 nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!socket', fd);
                 nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ring', $!ring);
+                nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!managed', $!managed);
                 nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!enc',
                         $!encoding.name);
                 nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!encoder',
                         $!encoding.encoder());
                 nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!domain', AF::INET);
-                nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!acceptable', 0);
                 nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ipproto', $!ipproto);
                 setup-close($client_socket);
                 emit($client_socket);
@@ -347,16 +351,18 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
   #| Listen for incoming connections.
   method listen(IO::URing::Socket::INET:U: Str $host, Int $port where IO::Socket::Async::Port-Number,
                 Int() $backlog = 128, :$ip6, :REUSEADDR(:$reuseaddr), :REUSEPORT(:$reuseport),
-                :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
+                :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing :$ring = IO::URing:U) {
     my $domain = $ip6 ?? AF::INET6 !! AF::INET;
     my $encoding = Encoding::Registry.find($enc);
     my $ipproto = $ip6 ?? IPPROTO::IPV6 !! IPPROTO::IP;
+    my $managed = not $ring.defined;
+    my $ring-d = $ring // IO::URing.new(:128entries);
     Supply.new: SocketListenerTappable.new:
-      :$host, :$port, :$ring, :$backlog, :$encoding, :$scheduler, :$domain, :$ipproto, :$reuseport, :$reuseaddr
+      :$host, :$port, :ring($ring-d), :$backlog, :$encoding, :$scheduler, :$domain, :$ipproto, :$managed, :$reuseport, :$reuseaddr
   }
 
   #| Set up a socket to send udp datagrams.
-  method dgram(IO::URing::Socket::INET:U: :$broadcast, :$ip6, :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
+  method dgram(IO::URing::Socket::INET:U: :$broadcast, :$ip6, :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing :$ring = IO::URing:U) {
     my $p = Promise.new;
     $scheduler.cue: -> {
       my $domain = $ip6 ?? AF::INET6 !! AF::INET;
@@ -364,12 +370,15 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       my $encoding = Encoding::Registry.find($enc);
       my $client_socket := nqp::create(self);
       my $ipproto = $ip6 ?? IPPROTO::IPV6 !! IPPROTO::IP;
+      my $managed = not $ring.defined;
+      my $ring-d = $ring // IO::URing.new(:128entries);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!socket', $socket);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!domain', $domain);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ipproto', $ipproto);
       nqp::bindattr_i($client_socket, IO::URing::Socket::INET, '$!dgram', 1);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!datagram', INET-Datagram);
-      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ring', $ring);
+      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ring', $ring-d);
+      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!managed', $managed);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!enc', $encoding.name);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!encoder',
               $encoding.encoder());
@@ -387,7 +396,7 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
 
   #| Set up a socket to listen for udp datagrams.
   method bind-dgram(IO::URing::Socket::INET:U: Str() $host, Int() $port where IO::Socket::Async::Port-Number, :$ip6,
-                   :REUSEADDR(:$reuseaddr), :REUSEPORT(:$reuseport), :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing:D :$ring = IO::URing.new(:128entries)) {
+                   :REUSEADDR(:$reuseaddr), :REUSEPORT(:$reuseport), :$enc = 'utf-8', :$scheduler = $*SCHEDULER, IO::URing :$ring = IO::URing:U) {
     my $p = Promise.new;
     $scheduler.cue: -> {
       my $domain = $ip6 ?? AF::INET6 !! AF::INET;
@@ -395,12 +404,15 @@ class IO::URing::Socket::INET does IO::URing::Socket is export {
       my $encoding = Encoding::Registry.find($enc);
       my $client_socket := nqp::create(self);
       my $ipproto = $ip6 ?? IPPROTO::IPV6 !! IPPROTO::IP;
+      my $managed = not $ring.defined;
+      my $ring-d = $ring // IO::URing.new(:128entries);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!socket', $socket);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!domain', $domain);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ipproto', $ipproto);
       nqp::bindattr_i($client_socket, IO::URing::Socket::INET, '$!dgram', 1);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!datagram', INET-Datagram);
-      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ring', $ring);
+      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!ring', $ring-d);
+      nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!managed', $managed);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!enc', $encoding.name);
       nqp::bindattr($client_socket, IO::URing::Socket::INET, '$!encoder',
               $encoding.encoder());

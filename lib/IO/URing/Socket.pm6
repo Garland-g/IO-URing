@@ -53,6 +53,9 @@ await IO::URing::Socket::INET.connect('127.0.0.1', 3333).then( -> $promise {
 IO::URing::Socket is a role that contains code common to all IO::URing sockets.
 It implements the same interface as IO::Socket::Async.
 
+Any method that creates a socket (connect, listen, dgram, bind-dgram, udp, bind-udp) can be passed its own
+IO::URing object. The caller is responsible for closing any IO::URing objects passed into socket creation methods.
+
 =head2 IO::URing::Socket methods
 
 =end pod
